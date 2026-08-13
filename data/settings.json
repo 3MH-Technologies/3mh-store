@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-13T13:11:23.427Z",
+  "updatedAt": "2026-08-13T14:00:00.000Z",
   "settings": {
     "appName": "3MH STORE",
     "appNameAr": "متجر 3MH التقني",
@@ -40,16 +40,9 @@
       "stats": [
         {
           "label": "منتج رقمي",
-          "value": "13",
-          "suffix": "+",
-          "animate": true
-        },
-        {
-          "label": "معدل الرضا",
-          "value": "4.9",
-          "suffix": "/5",
-          "decimals": 1,
-          "animate": true
+          "value": "0",
+          "suffix": "",
+          "animate": false
         },
         {
           "label": "شبكات دفع",

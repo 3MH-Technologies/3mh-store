@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mail, Send } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
+import { Logo } from './ui/Logo'
 
 export function Footer() {
   const { settings } = useStore()
@@ -10,9 +11,7 @@ export function Footer() {
       <div className="container-app grid gap-10 py-12 md:grid-cols-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 text-base font-black text-white">
-              3
-            </span>
+            <Logo />
             <div className="leading-tight">
               <p className="text-sm font-black text-white">{settings.companyName}</p>
               <p className="text-[11px] text-slate-400">{settings.appNameAr}</p>

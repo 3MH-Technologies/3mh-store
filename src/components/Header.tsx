@@ -1,6 +1,7 @@
 ﻿import { Link, useNavigate } from 'react-router-dom'
 import { Search, ShoppingCart, Wrench } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
+import { Logo } from './ui/Logo'
 
 export function Header() {
   const { cartCount, setCartOpen, settings } = useStore()
@@ -10,9 +11,7 @@ export function Header() {
     <header className="border-b border-slate-800 bg-brand-900/80">
       <div className="container-app flex h-16 items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 text-base font-black text-white">
-            3
-          </span>
+          <Logo />
           <span className="leading-tight">
             <span className="block text-sm font-black tracking-wide text-white">
               {settings.appName}

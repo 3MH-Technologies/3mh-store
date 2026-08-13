@@ -66,7 +66,7 @@ function AdminLogin({
       onSuccess()
       notify('مرحباً بك في لوحة التحكم', 'success')
     } else {
-      setError('رقم PIN غير صحيح')
+      setError('كلمة المرور غير صحيحة')
       setPin('')
     }
   }
@@ -81,23 +81,22 @@ function AdminLogin({
           لوحة التحكم — دخول المشرف
         </h1>
         <p className="mt-2 text-center text-xs text-slate-400">
-          المنطقة محمية برقم PIN خاص بالفريق الإداري فقط.
+          المنطقة محمية بكلمة مرور خاصة بالفريق الإداري فقط.
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-3">
           <div className="relative">
             <input
               type={show ? 'text' : 'password'}
-              inputMode="numeric"
               value={pin}
               onChange={(e) => {
-                setPin(e.target.value.replace(/[^0-9]/g, ''))
+                setPin(e.target.value)
                 setError('')
               }}
-              placeholder="••••"
+              placeholder="••••••••"
               className="input py-3 text-center text-xl tracking-[0.5em]"
-              aria-label="رقم PIN"
-              maxLength={8}
+              aria-label="كلمة المرور"
+              maxLength={32}
             />
             <button
               type="button"
