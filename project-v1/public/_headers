@@ -1,6 +1,0 @@
-/*
-  X-Frame-Options: SAMEORIGIN
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  X-Robots-Tag: noindex
