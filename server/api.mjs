@@ -963,7 +963,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
             await new Promise((resolve) => setTimeout(resolve, 800))
           }
         }
-        const rawPath = `files/${productId}/${fileName}`
+        const rawPath = `${kind === 'image' ? 'images' : 'files'}/${productId}/${fileName}`
         const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${rawPath}`, {
           method: 'PUT',
           body: JSON.stringify({
