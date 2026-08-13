@@ -1,6 +1,7 @@
 export type OrderStatus = 'pending' | 'verified' | 'rejected'
 
 export type PaymentMethod =
+  | 'plisio'
   | 'usdt-trc20'
   | 'usdt-bep20'
   | 'usdt-erc20'
@@ -157,6 +158,7 @@ export interface Order {
     txHash: string
     walletAddress?: string
     receiptDataUrl: string | null
+    plisio?: { txnId: string; invoiceUrl: string }
   }
   status: OrderStatus
   verifiedAt: string | null

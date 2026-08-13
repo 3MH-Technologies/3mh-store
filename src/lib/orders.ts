@@ -69,6 +69,7 @@ export function paymentMethodLabel(
   method: PaymentMethod,
   labels: Record<PaymentMethod, string>
 ): string {
+  if (method === 'plisio') return 'Plisio (بوابة دفع آمنة)'
   return labels[method] ?? method
 }
 

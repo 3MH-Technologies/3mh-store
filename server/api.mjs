@@ -29,6 +29,8 @@ function makeEnv(env) {
       pick(env, ['ASSET_SECRET', 'VITE_ASSET_SECRET']) || '',
     apiSecret:
       pick(env, ['API_SECRET', 'VITE_API_SECRET']) || '3mh-store-api-change-me',
+    plisioKey: pick(env, ['PLISIO_KEY', 'PLISIO_API_KEY', 'VITE_PLISIO_KEY']) || '',
+    siteUrl: pick(env, ['SITE_URL', 'VITE_SITE_URL']) || '',
   }
 }
 
@@ -337,6 +339,22 @@ function safeId() {
   return `ORD-${id.slice(0, 4)}-${id.slice(4)}`
 }
 
+async function hmacSha1Hex(key, data) {
+  const enc = new TextEncoder()
+  const imported = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(key),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', imported, enc.encode(data))
+  const bytes = new Uint8Array(sig)
+  let hex = ''
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0')
+  return hex
+}
+
 function cleanText(value, max) {
   const v = String(value ?? '')
   return v.trim().slice(0, max)
@@ -472,6 +490,85 @@ function headerValue(headers, name) {
   if (!headers) return ''
   const value = typeof headers.get === 'function' ? headers.get(name) : headers[name]
   return String(value ?? '')
+}
+
+// ---------- order status (shared by admin PATCH + Plisio webhook) ----------
+
+async function updateOrderStatus(cfg, orderId, status, notesValue, opts = {}) {
+  return withWriteLock(cfg, ORDERS_PATH, async () => {
+    let file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+    let orders = Array.isArray(file.orders) ? file.orders : []
+    let index = orders.findIndex((o) => o.id === orderId)
+    for (let i = 0; i < 3 && index === -1; i++) {
+      await new Promise((r) => setTimeout(r, 900))
+      file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+      orders = Array.isArray(file.orders) ? file.orders : []
+      index = orders.findIndex((o) => o.id === orderId)
+    }
+    if (index === -1) throw new Error('ORDER_NOT_FOUND')
+
+    if (status === 'verified' && !opts.skipStock) {
+      if (!cfg.assetSecret) throw new Error('NO_ASSET_SECRET')
+      const needs = new Map()
+      for (const item of orders[index].items || []) {
+        needs.set(item.productId, (needs.get(item.productId) || 0) + item.qty)
+      }
+      const plans = []
+      for (const [pid, qty] of needs) {
+        const stockFile = await readStockFile(cfg, pid)
+        if (!stockFile.exists) continue
+        const stockItems = stockFile.items
+        const available = stockItems.filter((i) => !i.used)
+        if (available.length < qty) {
+          const name = (orders[index].items || []).find((i) => i.productId === pid)?.title || pid
+          throw new Error(`NO_STOCK:${name}`)
+        }
+        plans.push({ pid, qty, stockFile, stockItems })
+      }
+      const deliveries = []
+      for (const plan of plans) {
+        let assigned = 0
+        for (const it of plan.stockItems) {
+          if (it.used || assigned >= plan.qty) continue
+          it.used = true
+          it.orderId = orderId
+          it.usedAt = new Date().toISOString()
+          const encrypted = await encryptPayload(
+            cfg.assetSecret,
+            JSON.stringify({
+              email: it.email || '',
+              password: it.password || '',
+              secret: it.secret || '',
+              verifyCode: it.verifyCode || '',
+            }),
+            `${SALT_DOMAIN}${orderId}`
+          )
+          deliveries.push({
+            productId: plan.pid,
+            title:
+              (orders[index].items || []).find((i) => i.productId === plan.pid)
+                ?.title || plan.pid,
+            payload: encrypted.payload,
+            iv: encrypted.iv,
+          })
+          assigned += 1
+        }
+        await withWriteLock(cfg, plan.stockFile.path, () =>
+          writeStockFile(cfg, plan.stockFile.path, plan.stockItems)
+        )
+      }
+      orders[index].deliveries = deliveries
+    }
+    orders[index].status = status
+    if (status === 'verified') orders[index].verifiedAt = new Date().toISOString()
+    if (status !== 'verified') orders[index].verifiedAt = null
+    if (notesValue !== undefined) {
+      orders[index].notes = cleanText(notesValue, 300)
+    }
+    await writeGitFile(cfg, ORDERS_PATH, stampFile(JSON.stringify(file)))
+    catalogCache = { ts: 0, data: null }
+    return orders[index]
+  })
 }
 
 // ---------- request handling ----------
@@ -656,26 +753,27 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         return badRequest('VALIDATION', 'أدخل تيليجرام أو رقم هاتف للتواصل')
       }
       const methodName = cleanText(input.paymentMethod, 20)
-      if (!walletMethods.includes(methodName)) {
+      const usingPlisio = Boolean(cfg.plisioKey) && methodName === 'plisio'
+      if (!usingPlisio && !walletMethods.includes(methodName)) {
         return badRequest('VALIDATION', 'طريقة الدفع غير متاحة')
       }
-      const txHash = cleanText(input.txHash, 120)
-      if (txHash.length < 6) {
+      const txHash = usingPlisio ? '' : cleanText(input.txHash, 120)
+      if (!usingPlisio && txHash.length < 6) {
         return badRequest('VALIDATION', 'أدخل معرف العملية (TxID) — لا يقل عن 6 أحرف')
       }
-      const walletAddress = cleanText(input.walletAddress, 200)
-      if (walletAddress.length < 10 || /\s/.test(walletAddress)) {
+      const walletAddress = usingPlisio ? '' : cleanText(input.walletAddress, 200)
+      if (!usingPlisio && (walletAddress.length < 10 || /\s/.test(walletAddress))) {
         return badRequest('VALIDATION', 'أدخل عنوان محفظتك بشكل صحيح — لا يقل عن 10 أحرف وبدون مسافات')
       }
       let receiptDataUrl = null
-      if (input.receiptDataUrl) {
+      if (!usingPlisio && input.receiptDataUrl) {
         receiptDataUrl = String(input.receiptDataUrl)
         if (receiptDataUrl.length > 3600000) {
           return badRequest('VALIDATION', 'مرفق الإثبات كبير جداً')
         }
         receiptDataUrl = receiptDataUrl.slice(0, 3600000)
       }
-      if (!receiptDataUrl || !receiptDataUrl.startsWith('data:image/') || receiptDataUrl.length < 100) {
+      if (!usingPlisio && (!receiptDataUrl || !receiptDataUrl.startsWith('data:image/') || receiptDataUrl.length < 100)) {
         return badRequest('VALIDATION', 'أرفق لقطة شاشة للتحويل كإثبات للدفع')
       }
       const notes = cleanText(input.notes, 300)
@@ -760,85 +858,15 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
           return badRequest('VALIDATION', 'حالة غير صالحة')
         }
         const orderId = cleanText(segments[2], 40)
-        const updated = await withWriteLock(cfg, ORDERS_PATH, async () => {
-          let file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
-          let orders = Array.isArray(file.orders) ? file.orders : []
-          let index = orders.findIndex((o) => o.id === orderId)
-          for (let i = 0; i < 3 && index === -1; i++) {
-            await new Promise((r) => setTimeout(r, 900))
-            file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
-            orders = Array.isArray(file.orders) ? file.orders : []
-            index = orders.findIndex((o) => o.id === orderId)
-          }
-          if (index === -1) throw new Error('ORDER_NOT_FOUND')
-
-          if (status === 'verified') {
-            if (!cfg.assetSecret) throw new Error('NO_ASSET_SECRET')
-            const needs = new Map()
-            for (const item of orders[index].items || []) {
-              needs.set(item.productId, (needs.get(item.productId) || 0) + item.qty)
+        const updated = await updateOrderStatus(cfg, orderId, status, input.notes).catch(
+          (e) => {
+            if (e instanceof Error && e.message.includes('ORDER_NOT_FOUND')) return null
+            if (e instanceof Error && e.message.startsWith('NO_STOCK:')) {
+              return { __noStock: e.message.slice(9) }
             }
-            const plans = []
-            for (const [pid, qty] of needs) {
-              const stockFile = await readStockFile(cfg, pid)
-              if (!stockFile.exists) continue
-              const stockItems = stockFile.items
-              const available = stockItems.filter((i) => !i.used)
-              if (available.length < qty) {
-                const name = (orders[index].items || []).find((i) => i.productId === pid)?.title || pid
-                throw new Error(`NO_STOCK:${name}`)
-              }
-              plans.push({ pid, qty, stockFile, stockItems })
-            }
-            const deliveries = []
-            for (const plan of plans) {
-              let assigned = 0
-              for (const it of plan.stockItems) {
-                if (it.used || assigned >= plan.qty) continue
-                it.used = true
-                it.orderId = orderId
-                it.usedAt = new Date().toISOString()
-                const encrypted = await encryptPayload(
-                  cfg.assetSecret,
-                  JSON.stringify({
-                    email: it.email || '',
-                    password: it.password || '',
-                    secret: it.secret || '',
-                    verifyCode: it.verifyCode || '',
-                  }),
-                  `${SALT_DOMAIN}${orderId}`
-                )
-                deliveries.push({
-                  productId: plan.pid,
-                  title:
-                    (orders[index].items || []).find((i) => i.productId === plan.pid)
-                      ?.title || plan.pid,
-                  payload: encrypted.payload,
-                  iv: encrypted.iv,
-                })
-                assigned += 1
-              }
-              await withWriteLock(cfg, plan.stockFile.path, () =>
-                writeStockFile(cfg, plan.stockFile.path, plan.stockItems)
-              )
-            }
-            orders[index].deliveries = deliveries
+            throw e
           }
-          orders[index].status = status
-          if (status === 'verified') orders[index].verifiedAt = new Date().toISOString()
-          if (status !== 'verified') orders[index].verifiedAt = null
-          const notes = cleanText(input.notes, 300)
-          if (input.notes !== undefined) orders[index].notes = notes
-          await writeGitFile(cfg, ORDERS_PATH, stampFile(JSON.stringify(file)))
-          catalogCache = { ts: 0, data: null }
-          return orders[index]
-        }).catch((e) => {
-          if (e instanceof Error && e.message.includes('ORDER_NOT_FOUND')) return null
-          if (e instanceof Error && e.message.startsWith('NO_STOCK:')) {
-            return { __noStock: e.message.slice(9) }
-          }
-          throw e
-        })
+        )
         if (!updated) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
         if (updated.__noStock) {
           return badRequest('NO_STOCK', `لا يوجد مخزون متاح كافٍ لـ «${updated.__noStock}» — أضف عناصر من تبويب المنتجات`)
@@ -1256,6 +1284,121 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         fileName: fileNameFromPath(filePath),
         publicCache: true,
       }
+    }
+
+    // POST /api/plisio/invoice — إنشاء فاتورة دفع عبر Plisio
+    if (method === 'POST' && base === 'plisio' && segments[1] === 'invoice') {
+      if (!cfg.plisioKey) return internalError('بوابة الدفع غير مهيأة')
+      if (isRateLimited(`plisio:${ip}`, 10, 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
+      let input = {}
+      try {
+        input = typeof body === 'string' ? JSON.parse(body) : body || {}
+      } catch {
+        // fall through
+      }
+      const orderId = cleanText(input.orderId, 40)
+      if (!orderId) return badRequest('VALIDATION', 'بيانات غير مكتملة')
+      let file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+      let order = (file.orders || []).find((o) => o.id === orderId)
+      for (let i = 0; i < 3 && !order; i++) {
+        await new Promise((r) => setTimeout(r, 900))
+        file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+        order = (file.orders || []).find((o) => o.id === orderId)
+      }
+      if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      if (order.status !== 'pending') {
+        return badRequest('ORDER_NOT_PENDING', 'الطلب لم يعد قيد الدفع')
+      }
+      if (order.plisio?.invoiceUrl) {
+        return ok({ invoiceUrl: order.plisio.invoiceUrl, txnId: order.plisio.txnId || '' })
+      }
+      const siteBase = (cfg.siteUrl || 'https://3mh-store.pages.dev').replace(/\/$/, '')
+      const params = new URLSearchParams({
+        api_key: cfg.plisioKey,
+        source_currency: 'USD',
+        source_amount: String(Math.round(Number(order.total || 0) * 100) / 100),
+        order_number: orderId,
+        order_name: cleanText((order.items || [])[0]?.title || orderId, 120),
+        email: cleanText(order.customer?.email || '', 100),
+        callback_url: `${siteBase}/api/plisio/webhook?json=true`,
+        success_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
+        fail_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
+        success_invoice_url: `${siteBase}/track/${orderId}`,
+        fail_invoice_url: `${siteBase}/track/${orderId}`,
+        expire_min: '30',
+        language: 'en_US',
+        plugin: '3mh-store',
+      })
+      let plisioRes
+      try {
+        const res = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`)
+        plisioRes = await res.json()
+      } catch {
+        return internalError('تعذر الاتصال ببوابة الدفع')
+      }
+      if (plisioRes?.status !== 'success' || !plisioRes.data?.invoice_url) {
+        return badRequest('PLISIO_ERROR', String(plisioRes?.data?.message || 'فشل إنشاء الفاتورة'))
+      }
+      const txnId = cleanText(plisioRes.data.txn_id, 60)
+      const invoiceUrl = cleanText(plisioRes.data.invoice_url, 300)
+      await withWriteLock(cfg, ORDERS_PATH, async () => {
+        const fresh = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+        const target = (fresh.orders || []).find((o) => o.id === orderId)
+        if (target && !target.plisio) {
+          target.plisio = { txnId, invoiceUrl }
+          await writeGitFile(cfg, ORDERS_PATH, stampFile(JSON.stringify(fresh)))
+        }
+      })
+      return ok({ invoiceUrl, txnId })
+    }
+
+    // POST /api/plisio/webhook — تأكيد تلقائي من بوابة الدفع
+    if (method === 'POST' && base === 'plisio' && segments[1] === 'webhook') {
+      if (!cfg.plisioKey) return internalError('بوابة الدفع غير مهيأة')
+      let data = null
+      try {
+        data = typeof body === 'string' ? JSON.parse(body) : body
+      } catch {
+        // fall through
+      }
+      if (!data || typeof data !== 'object' || typeof data.verify_hash !== 'string') {
+        return { status: 422, body: { error: { code: 'BAD_CALLBACK', message: 'بيانات غير صالحة' } } }
+      }
+      const signed = { ...data }
+      delete signed.verify_hash
+      const expect = data.verify_hash
+      const got = await hmacSha1Hex(cfg.plisioKey, JSON.stringify(signed))
+      if (got !== expect) {
+        return { status: 422, body: { error: { code: 'BAD_SIGNATURE', message: 'توقيع غير صالح' } } }
+      }
+      const orderNumber = cleanText(data.order_number, 40)
+      const status = cleanText(data.status, 30)
+      if (!orderNumber) {
+        return { status: 422, body: { error: { code: 'BAD_CALLBACK', message: 'بيانات غير صالحة' } } }
+      }
+      try {
+        if (status === 'completed') {
+          try {
+            await updateOrderStatus(cfg, orderNumber, 'verified')
+          } catch (e) {
+            if (e instanceof Error && e.message.startsWith('NO_STOCK:')) {
+              await updateOrderStatus(cfg, orderNumber, 'verified', 'الدفع مؤكد عبر Plisio لكن المخزون لم يكن متاحاً — تواصل مع الدعم', { skipStock: true })
+            } else {
+              throw e
+            }
+          }
+        } else if (status === 'expired' || status === 'cancelled' || status === 'error') {
+          await updateOrderStatus(cfg, orderNumber, 'rejected', `الدفع لم يكتمل (${status})`).catch(() => {})
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes('ORDER_NOT_FOUND')) {
+          return ok({ ok: true })
+        }
+        throw e
+      }
+      return ok({ ok: true })
     }
 
     return notFound('NOT_FOUND', 'الواجهة غير موجودة')

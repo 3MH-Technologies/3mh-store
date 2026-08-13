@@ -440,6 +440,11 @@ const setStatus = async (order: Order, status: Order['status']) => {
                               </button>
                             </p>
                           )}
+                          {order.payment.plisio && (
+                            <p className="text-[11px] text-slate-500" dir="ltr">
+                              Plisio: {order.payment.plisio.txnId}
+                            </p>
+                          )}
                           {order.payment.receiptDataUrl && (
                             <a
                               href={order.payment.receiptDataUrl}

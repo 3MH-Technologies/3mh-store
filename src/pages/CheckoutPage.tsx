@@ -1,32 +1,29 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowRight,
-  Banknote,
   Check,
   CheckCircle2,
-  ClipboardCopy,
   FileText,
   Loader2,
   LockKeyhole,
   Mail,
   Phone,
-  QrCode,
   RefreshCw,
   Send,
   ShieldCheck,
   ShoppingCart,
   User,
+  Wallet,
 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
-import type { PaymentMethod } from '../types'
-import { computeOrderTotals, paymentMethodLabel } from '../lib/orders'
+import { computeOrderTotals } from '../lib/orders'
 import { formatSAR, formatUSD, isValidEmail } from '../lib/format'
 import { api } from '../lib/api'
 import type { Order } from '../types'
 
-type Step = 'info' | 'pay' | 'submit' | 'done'
+type Step = 'info' | 'submit' | 'done'
 
 interface FormState {
   name: string
@@ -60,17 +57,12 @@ function makeCaptcha(): Captcha {
 }
 
 export function CheckoutPage() {
-  const { cart, clearCart, notify, settings } = useStore()
-  const wallets = settings.wallets
+  const { cart, clearCart } = useStore()
   const [step, setStep] = useState<Step>('info')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
-  const [method, setMethod] = useState<PaymentMethod>(settings.wallets[0]?.method ?? 'usdt-trc20')
-  const [txHash, setTxHash] = useState('')
-  const [walletAddress, setWalletAddress] = useState('')
-  const [notes, setNotes] = useState('')
-  const [receiptFile, setReceiptFile] = useState<string | null>(null)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [walletError, setWalletError] = useState('')
   const [captcha, setCaptcha] = useState<Captcha>(makeCaptcha)
@@ -78,34 +70,6 @@ export function CheckoutPage() {
   const [lastAttempt, setLastAttempt] = useState(0)
 
   const totals = useMemo(() => computeOrderTotals(cart), [cart])
-  const wallet = wallets.find((w) => w.method === method) ?? wallets[0]
-  const qrText = wallet?.kind === 'address' ? wallet.address : `تحويل إلى ${wallet?.address ?? ''}`
-
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    if (method) {
-      import('qrcode').then(({ default: QRCode }) => {
-        QRCode.toDataURL(qrText, {
-          margin: 1,
-          width: 240,
-          color: { dark: '#0b0f17', light: '#ffffff' },
-        })
-          .then((url) => {
-            if (!cancelled) setQrDataUrl(url)
-          })
-          .catch(() => {
-            if (!cancelled) setQrDataUrl(null)
-          })
-      })
-    } else {
-      setQrDataUrl(null)
-    }
-    return () => {
-      cancelled = true
-    }
-  }, [method, qrText])
 
   const validateInfo = (): boolean => {
     const next: typeof errors = {}
@@ -119,28 +83,26 @@ export function CheckoutPage() {
     return Object.keys(next).length === 0
   }
 
-  const handleCopy = async (text: string, label: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      notify(`تم نسخ ${label}`, 'success')
-    } catch {
-      notify('تعذر النسخ، انسخ يدوياً', 'error')
-    }
-  }
-
-  const handleReceipt = (file: File | null) => {
-    if (!file) {
-      setReceiptFile(null)
+  const startPayment = async () => {
+    if (!createdOrder) {
+      setWalletError('أنشئ الطلب أولاً ثم أعد المحاولة')
       return
     }
-    if (file.size > 2_500_000) {
-      setWalletError('حجم المرفق يتجاوز 2.5MB، ارفع صورة أصغر')
-      return
-    }
+    setRedirecting(true)
     setWalletError('')
-    const reader = new FileReader()
-    reader.onload = () => setReceiptFile(reader.result as string)
-    reader.readAsDataURL(file)
+    try {
+      const invoice = await api.createPlisioInvoice(createdOrder.id)
+      window.location.assign(invoice.invoiceUrl)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('ORDER_NOT_PENDING')) {
+        setWalletError('تمت معالجة هذا الطلب — راجع صفحة التتبع')
+        setStep('done')
+      } else {
+        setWalletError('تعذر فتح صفحة الدفع — حاول مرة أخرى')
+      }
+      setRedirecting(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -151,20 +113,6 @@ export function CheckoutPage() {
     }
     if (Date.now() - lastAttempt < 10000) {
       setWalletError('انتظر قليلاً قبل إعادة المحاولة')
-      return
-    }
-    const cleanHash = txHash.trim()
-    if (cleanHash.length < 6) {
-      setWalletError('أدخل معرف العملية (TxID) — لا يقل عن 6 أحرف')
-      return
-    }
-    const cleanWallet = walletAddress.trim()
-    if (cleanWallet.length < 10 || /\s/.test(cleanWallet)) {
-      setWalletError('أدخل عنوان محفظتك — لا يقل عن 10 أحرف وبدون مسافات')
-      return
-    }
-    if (!receiptFile) {
-      setWalletError('أرفق لقطة شاشة للتحويل كإثبات للدفع')
       return
     }
     if (!form.terms) {
@@ -192,35 +140,21 @@ export function CheckoutPage() {
           telegram: form.telegram.trim(),
           phone: form.phone.trim(),
         },
-        paymentMethod: method,
-        txHash: cleanHash,
-        walletAddress: cleanWallet,
-        receiptDataUrl: receiptFile,
-        notes,
+        paymentMethod: 'plisio',
         honeypot: form.honeypot,
       })
       setCreatedOrder(order)
       clearCart()
-      setStep('done')
-      notify(`تم إنشاء طلبك بنجاح رقم ${order.id}`, 'success')
+      await startPayment()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
-      if (msg.includes('NO_GITHUB_CONFIG')) {
-        setWalletError(
-          'عذراً، المتجر غير مهيأ حالياً. يرجى المحاولة لاحقاً'
-        )
-      } else if (msg.includes('RATE_LIMITED')) {
-        setWalletError(
-          'طلبات كثيرة جداً خلال فترة قصيرة. انتظر قليلاً ثم أعد المحاولة'
-        )
-      } else if (msg.includes('ORDER_REJECTED')) {
-        setWalletError(
-          'تعذر تأكيد الطلب في الوقت الحالي. يرجى المحاولة بعد قليل'
-        )
+      if (msg.includes('RATE_LIMIT')) {
+        setWalletError('طلبات كثيرة جداً خلال فترة قصيرة. انتظر قليلاً ثم أعد المحاولة')
+      } else if (msg.includes('PLISIO')) {
+        setWalletError('بوابة الدفع غير متاحة حالياً — حاول لاحقاً')
       } else {
         setWalletError(`حدث خطأ أثناء إرسال الطلب: ${msg} ؟ يرجى المحاولة مرة أخرى`)
       }
-    } finally {
       setSubmitting(false)
     }
   }
@@ -240,32 +174,48 @@ export function CheckoutPage() {
     )
   }
 
-  if (step === 'done' && createdOrder) {
+  if (step === 'done') {
     return (
       <div className="container-app max-w-2xl py-16 text-center">
         <div className="card p-8">
           <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" />
           <h1 className="mt-4 text-2xl font-black text-white">تم استلام طلبك</h1>
           <p className="mt-2 text-sm leading-7 text-slate-400">
-            تم إنشاء طلبك بنجاح، فريق المراجعة يتحقق من العملية الآن.
-            راقب حالتك من صفحة تتبع الطلب برقم الطلب:
+            {createdOrder
+              ? 'أكمل الدفع عبر صفحة Plisio الآمنة، وسيُفعَّل طلبك تلقائياً فور اكتمال التحويل.'
+              : 'تم إنشاء طلبك بنجاح، راقب حالته من صفحة التتبع.'}
           </p>
-          <p className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-lg font-black tracking-wider text-cyan-300" dir="ltr">
-            {createdOrder.id}
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Link to={`/track/${createdOrder.id}`} className="btn-primary">
-              تتبع الطلب الآن
+          {createdOrder && (
+            <>
+              <p className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-lg font-black tracking-wider text-cyan-300" dir="ltr">
+                {createdOrder.id}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <button type="button" className="btn-primary" onClick={() => void startPayment()} disabled={redirecting}>
+                  {redirecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      جارٍ فتح الدفع...
+                    </>
+                  ) : (
+                    <>
+                      <Wallet className="h-4 w-4" />
+                      الدفع عبر Plisio
+                    </>
+                  )}
+                </button>
+                <Link to={`/track/${createdOrder.id}`} className="btn-ghost">
+                  <FileText className="h-4 w-4" />
+                  تتبع الطلب
+                </Link>
+              </div>
+            </>
+          )}
+          {!createdOrder && (
+            <Link to="/" className="btn-primary mt-6">
+              العودة إلى المتجر
             </Link>
-            <Link to={`/invoice/${createdOrder.id}`} className="btn-ghost">
-              <FileText className="h-4 w-4" />
-              عرض الفاتورة
-            </Link>
-          </div>
-          <p className="mt-6 text-xs text-slate-500">
-            تأكد من مراجعة بريدك الإلكتروني، وسنبلغك بأي استفسار عبر تيليجرام
-            <span dir="ltr"> @{settings.supportTelegramUsername}</span>.
-          </p>
+          )}
         </div>
       </div>
     )
@@ -283,13 +233,10 @@ export function CheckoutPage() {
       <ol className="mt-6 flex items-center gap-2 text-xs font-bold">
         {[
           { id: 'info', label: 'بياناتك' },
-          { id: 'pay', label: 'الدفع' },
-          { id: 'submit', label: 'التأكيد' },
+          { id: 'submit', label: 'التأكيد والدفع' },
         ].map((item, index, arr) => {
           const active = step === item.id
-          const done = ['pay', 'submit', 'done'].includes(step)
-            ? index < arr.findIndex((i) => i.id === step)
-            : false
+          const done = ['submit', 'done'].includes(step) && index === 0
           return (
             <li key={item.id} className="flex items-center gap-2">
               <span
@@ -403,7 +350,7 @@ export function CheckoutPage() {
                 />
                 <span>
                   أوافق على شروط الاستخدام، وأقر بأن المنتجات الرقمية تُسلم
-                  بعد التحقق من العملية ولا تُردّ بعد فتح روابط الأصول.
+                  بعد تأكيد الدفع ولا تُردّ بعد فتح روابط الأصول.
                 </span>
               </label>
               {errors.terms && (
@@ -424,116 +371,12 @@ export function CheckoutPage() {
                 type="button"
                 className="btn-primary w-full"
                 onClick={() => {
-                  if (validateInfo()) setStep('pay')
+                  if (validateInfo()) setStep('submit')
                 }}
               >
-                متابعة إلى الدفع
+                متابعة إلى التأكيد والدفع
                 <ArrowLeft className="h-4 w-4" />
               </button>
-            </div>
-          )}
-
-          {step === 'pay' && wallet && (
-            <div className="space-y-6">
-              <h2 className="flex items-center gap-2 text-base font-extrabold text-white">
-                <Banknote className="h-4 w-4 text-cyan-400" />
-                اختر طريقة الدفع
-              </h2>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {wallets.map((w) => (
-                  <button
-                    key={w.method}
-                    type="button"
-                    onClick={() => setMethod(w.method)}
-                    className={`rounded-xl border p-4 text-start transition-colors ${
-                      method === w.method
-                        ? 'border-cyan-400/60 bg-cyan-400/10'
-                        : 'border-slate-700 bg-slate-900/40 hover:border-slate-500'
-                    }`}
-                  >
-                    <span className="flex items-center justify-between">
-                      <span className="text-sm font-extrabold text-white">
-                        {w.name}
-                      </span>
-                      {method === w.method && (
-                        <Check className="h-4 w-4 text-cyan-300" />
-                      )}
-                    </span>
-                    <span className="mt-1 block text-[11px] text-slate-400">
-                      {w.kind === 'phone' ? 'رقم محفظة' : 'عنوان شبكة'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-5">
-                <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                  <div className="flex flex-col items-center gap-2">
-                    {qrDataUrl ? (
-                      <img
-                        src={qrDataUrl}
-                        alt={`QR Code ${wallet.name}`}
-                        className="h-40 w-40 rounded-xl border border-slate-700 bg-white p-2"
-                      />
-                    ) : (
-                      <div className="flex h-40 w-40 items-center justify-center rounded-xl border border-slate-700 bg-slate-800">
-                        <QrCode className="h-10 w-10 text-slate-600" />
-                      </div>
-                    )}
-                    <span className="text-[11px] text-slate-500">
-                      امسح الرمز أو انسخ البيانات
-                    </span>
-                  </div>
-
-                  <div className="min-w-0 flex-1 text-sm">
-                    <p className="font-extrabold text-white">{wallet.name}</p>
-                    <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-700 bg-brand-900 px-3 py-2">
-                      <code
-                        dir="ltr"
-                        className="min-w-0 flex-1 truncate text-xs text-cyan-300"
-                      >
-                        {wallet.address}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(wallet.address, 'العنوان')}
-                        className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-700 hover:text-cyan-300"
-                        aria-label="نسخ العنوان"
-                      >
-                        <ClipboardCopy className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <p className="mt-3 text-xs leading-6 text-slate-300">
-                      {wallet.instruction}
-                    </p>
-                    <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/5 px-3 py-2 text-[11px] leading-5 text-amber-200">
-                      <b>المبلغ المطلوب:</b> {formatUSD(totals.total)} ≈{' '}
-                      {formatSAR(totals.total)}
-                    </div>
-                    <p className="mt-2 text-[11px] text-slate-500">{wallet.note}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setStep('info')}
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  رجوع
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary flex-1"
-                  onClick={() => setStep('submit')}
-                >
-                  أكملت الدفع — متابعة
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-              </div>
             </div>
           )}
 
@@ -541,76 +384,24 @@ export function CheckoutPage() {
             <div className="space-y-5">
               <h2 className="flex items-center gap-2 text-base font-extrabold text-white">
                 <LockKeyhole className="h-4 w-4 text-cyan-400" />
-                إثبات عملية الدفع
+                تأكيد الطلب والدفع
               </h2>
-              <p className="text-xs leading-6 text-slate-400">
-                أرسل معرف العملية أو أرفق لقطة من التحويل عبر{' '}
-                <b className="text-slate-200">{paymentMethodLabel(method, settings.paymentMethodLabels)}</b>.
-                المراجعة اليدوية تستغرق عادةً أقل من ساعة، وسيُفتح رابط الأصول
-                فور التحقق.
-              </p>
 
-              <div>
-                <label className="label" htmlFor="txHash">
-                  معرف العملية (Transaction Hash / TxID)
-                </label>
-                <input
-                  id="txHash"
-                  dir="ltr"
-                  className={`input text-left ${walletError && !txHash ? 'border-rose-500' : ''}`}
-                  value={txHash}
-                  onChange={(e) => setTxHash(e.target.value)}
-                  placeholder="0x4f8a2c… أو 6 أحرف على الأقل"
-                />
-              </div>
-
-              <div>
-                <label className="label" htmlFor="walletAddress">
-                  عنوان محفظتك (التي حولت منها)
-                </label>
-                <input
-                  id="walletAddress"
-                  dir="ltr"
-                  className={`input text-left ${walletError && !walletAddress ? 'border-rose-500' : ''}`}
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value.replace(/\s/g, ''))}
-                  placeholder="T… أو 0x… — عنوان محفظة المرسل"
-                />
-                <p className="mt-1 text-[10px] leading-5 text-slate-500">
-                  عنوان المحفظة التي أرسلت منها التحويل — يساعد فريق المراجعة
-                  في التحقق من العملية.
+              <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/5 p-4">
+                <p className="flex items-center gap-2 text-sm font-extrabold text-emerald-300">
+                  <ShieldCheck className="h-4 w-4" />
+                  الدفع عبر Plisio — بوابة دفع آمنة
                 </p>
-              </div>
-
-              <div>
-                <label className="label" htmlFor="receipt">
-                  مرفق الإثبات (مطلوب — لقطة شاشة للتحويل، حد أقصى 2.5MB)
-                </label>
-                <input
-                  id="receipt"
-                  type="file"
-                  accept="image/*"
-                  className="block w-full cursor-pointer text-xs text-slate-400 file:me-3 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white"
-                  onChange={(e) => handleReceipt(e.target.files?.[0] ?? null)}
-                />
-                {receiptFile && (
-                  <img
-                    src={receiptFile}
-                    alt="مرفق إثبات الدفع"
-                    className="mt-3 max-h-40 rounded-lg border border-slate-700"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="label" htmlFor="notes">ملاحظات إضافية (اختياري)</label>
-                <textarea
-                  id="notes"
-                  className="input min-h-20 resize-none"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="أي تفاصيل تساعد في التحقق من العملية..."
-                />
+                <p className="mt-2 text-xs leading-6 text-slate-300">
+                  بعد تأكيد الطلب سيتم تحويلك لصفحة الدفع الآمنة عبر Plisio
+                  (BTC، ETH، USDT وغيرها). يتم تأكيد طلبك وتفعيل روابط الأصول
+                  <b className="text-emerald-300"> تلقائياً </b>فور اكتمال التحويل
+                  — بدون مراجعة يدوية.
+                </p>
+                <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                  مدة صلاحية الفاتورة: 30 دقيقة — إن انتهت صلاحيتها يمكنك إنشاء
+                  فاتورة جديدة من صفحة تتبع الطلب.
+                </p>
               </div>
 
               <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
@@ -669,7 +460,7 @@ export function CheckoutPage() {
                 <button
                   type="button"
                   className="btn-ghost"
-                  onClick={() => setStep('pay')}
+                  onClick={() => setStep('info')}
                   disabled={submitting}
                 >
                   <ArrowRight className="h-4 w-4" />
@@ -679,17 +470,17 @@ export function CheckoutPage() {
                   type="button"
                   className="btn-primary flex-1"
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || redirecting}
                 >
-                  {submitting ? (
+                  {submitting || redirecting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      جارٍ حفظ الطلب...
+                      جارٍ فتح صفحة الدفع الآمنة...
                     </>
                   ) : (
                     <>
-                      <Check className="h-4 w-4" />
-                      تأكيد الطلب النهائي
+                      <Wallet className="h-4 w-4" />
+                      تأكيد والانتقال للدفع
                     </>
                   )}
                 </button>

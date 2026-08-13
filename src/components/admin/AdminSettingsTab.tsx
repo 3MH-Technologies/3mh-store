@@ -30,6 +30,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ]
 
 const DEFAULT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  plisio: 'Plisio (بوابة دفع آمنة)',
   'usdt-trc20': 'USDT (TRC20)',
   'usdt-bep20': 'USDT (BEP20)',
   'usdt-erc20': 'USDT (ERC20)',

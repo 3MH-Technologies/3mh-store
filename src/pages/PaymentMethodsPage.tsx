@@ -80,8 +80,9 @@ export function PaymentMethodsPage() {
         </span>
         <h1 className="section-title mt-4">طرق الدفع المتاحة</h1>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-7 text-slate-400">
-          جميع عمليات الدفع عبر العملات الرقمية، وتُوثَّق يدوياً من فريق الدعم
-          خلال أقل من ساعة بعد إرسال إثبات الدفع.
+          الدفع يتم الآن عبر بوابة <b className="text-cyan-300">Plisio</b> الآمنة
+          — عند إتمام الطلب تُفتح لك فاتورة دفع تُؤكد تلقائياً فور اكتمال التحويل
+          (BTC، ETH، USDT وغيرها).
         </p>
       </div>
 

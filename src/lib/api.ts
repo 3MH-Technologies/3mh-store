@@ -112,14 +112,18 @@ export const api = {
     items: { productId: string; qty: number }[]
     customer: { name: string; email: string; telegram: string; phone: string }
     paymentMethod: string
-    txHash: string
-    walletAddress: string
-    receiptDataUrl: string | null
-    notes?: string
     honeypot?: string
   }): Promise<Order> {
     const data = await request<{ order: Order }>('/api/orders', { body: input })
     return data.order
+  },
+
+  async createPlisioInvoice(
+    orderId: string
+  ): Promise<{ invoiceUrl: string; txnId: string }> {
+    return request<{ invoiceUrl: string; txnId: string }>('/api/plisio/invoice', {
+      body: { orderId },
+    })
   },
 
   async adminLogin(pin: string): Promise<string> {
