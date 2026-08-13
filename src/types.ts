@@ -155,6 +155,7 @@ export interface Order {
   payment: {
     method: PaymentMethod
     txHash: string
+    walletAddress?: string
     receiptDataUrl: string | null
   }
   status: OrderStatus

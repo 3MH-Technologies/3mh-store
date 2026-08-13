@@ -113,6 +113,7 @@ export const api = {
     customer: { name: string; email: string; telegram: string; phone: string }
     paymentMethod: string
     txHash: string
+    walletAddress: string
     receiptDataUrl: string | null
     notes?: string
     honeypot?: string

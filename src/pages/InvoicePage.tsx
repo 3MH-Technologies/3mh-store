@@ -219,6 +219,11 @@ export function InvoicePage() {
             <p className="mt-1 text-xs text-slate-400" dir="ltr">
               {order.payment.txHash}
             </p>
+            {order.payment.walletAddress && (
+              <p className="mt-1 text-[11px] text-amber-200/80" dir="ltr">
+                محفظة المرسل: {order.payment.walletAddress}
+              </p>
+            )}
             {order.payment.receiptDataUrl && (
               <img
                 src={order.payment.receiptDataUrl}

@@ -66,6 +66,7 @@ export function CheckoutPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [method, setMethod] = useState<PaymentMethod>(settings.wallets[0]?.method ?? 'usdt-trc20')
   const [txHash, setTxHash] = useState('')
+  const [walletAddress, setWalletAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [receiptFile, setReceiptFile] = useState<string | null>(null)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
@@ -157,6 +158,15 @@ export function CheckoutPage() {
       setWalletError('أدخل معرف العملية (TxID) — لا يقل عن 6 أحرف')
       return
     }
+    const cleanWallet = walletAddress.trim()
+    if (cleanWallet.length < 10 || /\s/.test(cleanWallet)) {
+      setWalletError('أدخل عنوان محفظتك — لا يقل عن 10 أحرف وبدون مسافات')
+      return
+    }
+    if (!receiptFile) {
+      setWalletError('أرفق لقطة شاشة للتحويل كإثبات للدفع')
+      return
+    }
     if (!form.terms) {
       setWalletError('يجب الموافقة على شروط الاستخدام')
       return
@@ -184,6 +194,7 @@ export function CheckoutPage() {
         },
         paymentMethod: method,
         txHash: cleanHash,
+        walletAddress: cleanWallet,
         receiptDataUrl: receiptFile,
         notes,
         honeypot: form.honeypot,
@@ -554,8 +565,26 @@ export function CheckoutPage() {
               </div>
 
               <div>
+                <label className="label" htmlFor="walletAddress">
+                  عنوان محفظتك (التي حولت منها)
+                </label>
+                <input
+                  id="walletAddress"
+                  dir="ltr"
+                  className={`input text-left ${walletError && !walletAddress ? 'border-rose-500' : ''}`}
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value.replace(/\s/g, ''))}
+                  placeholder="T… أو 0x… — عنوان محفظة المرسل"
+                />
+                <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                  عنوان المحفظة التي أرسلت منها التحويل — يساعد فريق المراجعة
+                  في التحقق من العملية.
+                </p>
+              </div>
+
+              <div>
                 <label className="label" htmlFor="receipt">
-                  مرفق الإثبات (اختياري — لقطة شاشة، حد أقصى 2.5MB)
+                  مرفق الإثبات (مطلوب — لقطة شاشة للتحويل، حد أقصى 2.5MB)
                 </label>
                 <input
                   id="receipt"

@@ -424,6 +424,22 @@ const setStatus = async (order: Order, status: Order['status']) => {
                               <ClipboardCopy className="h-3.5 w-3.5" />
                             </button>
                           </p>
+                          {order.payment.walletAddress && (
+                            <p className="flex items-center gap-1.5 break-all text-[11px] text-amber-200/90">
+                              <span>محفظة المرسل:</span>
+                              <code dir="ltr" className="text-amber-200">
+                                {order.payment.walletAddress}
+                              </code>
+                              <button
+                                type="button"
+                                onClick={() => void copy(order.payment.walletAddress ?? '')}
+                                className="shrink-0 text-slate-500 hover:text-amber-300"
+                                aria-label="نسخ عنوان المحفظة"
+                              >
+                                <ClipboardCopy className="h-3.5 w-3.5" />
+                              </button>
+                            </p>
+                          )}
                           {order.payment.receiptDataUrl && (
                             <a
                               href={order.payment.receiptDataUrl}

@@ -663,6 +663,10 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       if (txHash.length < 6) {
         return badRequest('VALIDATION', 'أدخل معرف العملية (TxID) — لا يقل عن 6 أحرف')
       }
+      const walletAddress = cleanText(input.walletAddress, 200)
+      if (walletAddress.length < 10 || /\s/.test(walletAddress)) {
+        return badRequest('VALIDATION', 'أدخل عنوان محفظتك بشكل صحيح — لا يقل عن 10 أحرف وبدون مسافات')
+      }
       let receiptDataUrl = null
       if (input.receiptDataUrl) {
         receiptDataUrl = String(input.receiptDataUrl)
@@ -670,6 +674,9 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
           return badRequest('VALIDATION', 'مرفق الإثبات كبير جداً')
         }
         receiptDataUrl = receiptDataUrl.slice(0, 3600000)
+      }
+      if (!receiptDataUrl || !receiptDataUrl.startsWith('data:image/') || receiptDataUrl.length < 100) {
+        return badRequest('VALIDATION', 'أرفق لقطة شاشة للتحويل كإثبات للدفع')
       }
       const notes = cleanText(input.notes, 300)
 
@@ -684,7 +691,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         currency: 'USD',
         deliveryType:
           cleanText(settings?.deliveryNote, 80) || 'تسليم فوري رقمي بعد التحقق',
-        payment: { method: methodName, txHash, receiptDataUrl },
+        payment: { method: methodName, txHash, walletAddress, receiptDataUrl },
         status: 'pending',
         verifiedAt: null,
         notes,
