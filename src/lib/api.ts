@@ -119,10 +119,11 @@ export const api = {
   },
 
   async createPlisioInvoice(
-    orderId: string
+    orderId: string,
+    force = false
   ): Promise<{ invoiceUrl: string; txnId: string }> {
     return request<{ invoiceUrl: string; txnId: string }>('/api/plisio/invoice', {
-      body: { orderId },
+      body: { orderId, force },
     })
   },
 

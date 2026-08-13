@@ -1,11 +1,10 @@
 ﻿import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
-  FileText,
   Loader2,
   LockKeyhole,
   Mail,
@@ -21,7 +20,6 @@ import { useStore } from '../context/StoreContext'
 import { computeOrderTotals } from '../lib/orders'
 import { formatSAR, formatUSD, isValidEmail } from '../lib/format'
 import { api } from '../lib/api'
-import type { Order } from '../types'
 
 type Step = 'info' | 'submit' | 'done'
 
@@ -58,12 +56,11 @@ function makeCaptcha(): Captcha {
 
 export function CheckoutPage() {
   const { cart, clearCart } = useStore()
+  const navigate = useNavigate()
   const [step, setStep] = useState<Step>('info')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [redirecting, setRedirecting] = useState(false)
-  const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [walletError, setWalletError] = useState('')
   const [captcha, setCaptcha] = useState<Captcha>(makeCaptcha)
   const [captchaInput, setCaptchaInput] = useState('')
@@ -81,28 +78,6 @@ export function CheckoutPage() {
     if (!form.terms) next.terms = 'يجب الموافقة على شروط الاستخدام'
     setErrors(next)
     return Object.keys(next).length === 0
-  }
-
-  const startPayment = async () => {
-    if (!createdOrder) {
-      setWalletError('أنشئ الطلب أولاً ثم أعد المحاولة')
-      return
-    }
-    setRedirecting(true)
-    setWalletError('')
-    try {
-      const invoice = await api.createPlisioInvoice(createdOrder.id)
-      window.location.assign(invoice.invoiceUrl)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('ORDER_NOT_PENDING')) {
-        setWalletError('تمت معالجة هذا الطلب — راجع صفحة التتبع')
-        setStep('done')
-      } else {
-        setWalletError('تعذر فتح صفحة الدفع — حاول مرة أخرى')
-      }
-      setRedirecting(false)
-    }
   }
 
   const handleSubmit = async () => {
@@ -143,9 +118,8 @@ export function CheckoutPage() {
         paymentMethod: 'plisio',
         honeypot: form.honeypot,
       })
-      setCreatedOrder(order)
       clearCart()
-      await startPayment()
+      navigate(`/pay/${order.id}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
       if (msg.includes('RATE_LIMIT')) {
@@ -181,41 +155,11 @@ export function CheckoutPage() {
           <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" />
           <h1 className="mt-4 text-2xl font-black text-white">تم استلام طلبك</h1>
           <p className="mt-2 text-sm leading-7 text-slate-400">
-            {createdOrder
-              ? 'أكمل الدفع عبر صفحة Plisio الآمنة، وسيُفعَّل طلبك تلقائياً فور اكتمال التحويل.'
-              : 'تم إنشاء طلبك بنجاح، راقب حالته من صفحة التتبع.'}
+            تم إنشاء طلبك بنجاح، راقب حالته من صفحة التتبع.
           </p>
-          {createdOrder && (
-            <>
-              <p className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-lg font-black tracking-wider text-cyan-300" dir="ltr">
-                {createdOrder.id}
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <button type="button" className="btn-primary" onClick={() => void startPayment()} disabled={redirecting}>
-                  {redirecting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      جارٍ فتح الدفع...
-                    </>
-                  ) : (
-                    <>
-                      <Wallet className="h-4 w-4" />
-                      الدفع عبر Plisio
-                    </>
-                  )}
-                </button>
-                <Link to={`/track/${createdOrder.id}`} className="btn-ghost">
-                  <FileText className="h-4 w-4" />
-                  تتبع الطلب
-                </Link>
-              </div>
-            </>
-          )}
-          {!createdOrder && (
-            <Link to="/" className="btn-primary mt-6">
-              العودة إلى المتجر
-            </Link>
-          )}
+          <Link to="/" className="btn-primary mt-6">
+            العودة إلى المتجر
+          </Link>
         </div>
       </div>
     )
@@ -470,12 +414,12 @@ export function CheckoutPage() {
                   type="button"
                   className="btn-primary flex-1"
                   onClick={handleSubmit}
-                  disabled={submitting || redirecting}
+                  disabled={submitting}
                 >
-                  {submitting || redirecting ? (
+                  {submitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      جارٍ فتح صفحة الدفع الآمنة...
+                      جارٍ إنشاء الطلب وفتح صفحة الدفع...
                     </>
                   ) : (
                     <>

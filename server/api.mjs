@@ -1299,6 +1299,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         // fall through
       }
       const orderId = cleanText(input.orderId, 40)
+      const force = input.force === true || input.force === 'true' || input.force === 1
       if (!orderId) return badRequest('VALIDATION', 'بيانات غير مكتملة')
       let file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
       let order = (file.orders || []).find((o) => o.id === orderId)
@@ -1311,8 +1312,18 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       if (order.status !== 'pending') {
         return badRequest('ORDER_NOT_PENDING', 'الطلب لم يعد قيد الدفع')
       }
-      if (order.plisio?.invoiceUrl) {
+      if (!force && order.plisio?.invoiceUrl) {
         return ok({ invoiceUrl: order.plisio.invoiceUrl, txnId: order.plisio.txnId || '' })
+      }
+      if (force && order.plisio?.invoiceUrl) {
+        await withWriteLock(cfg, ORDERS_PATH, async () => {
+          const fresh = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+          const target = (fresh.orders || []).find((o) => o.id === orderId)
+          if (target?.plisio) {
+            target.plisio = undefined
+            await writeGitFile(cfg, ORDERS_PATH, stampFile(JSON.stringify(fresh)))
+          }
+        })
       }
       const siteBase = (cfg.siteUrl || 'https://3mh-store.pages.dev').replace(/\/$/, '')
       const params = new URLSearchParams({
@@ -1325,18 +1336,20 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         callback_url: `${siteBase}/api/plisio/webhook?json=true`,
         success_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
         fail_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
-        success_invoice_url: `${siteBase}/track/${orderId}`,
-        fail_invoice_url: `${siteBase}/track/${orderId}`,
+        success_invoice_url: `${siteBase}/pay/${orderId}`,
+        fail_invoice_url: `${siteBase}/pay/${orderId}`,
         expire_min: '30',
         language: 'en_US',
         plugin: '3mh-store',
       })
       let plisioRes
       try {
-        const res = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`)
+        const res = await fetch(`https://api.plisio.net/api/v1/invoices/new?${params.toString()}`, {
+          signal: AbortSignal.timeout(15000),
+        })
         plisioRes = await res.json()
       } catch {
-        return internalError('تعذر الاتصال ببوابة الدفع')
+        return internalError('تعذر الاتصال ببوابة الدفع — حاول مرة أخرى')
       }
       if (plisioRes?.status !== 'success' || !plisioRes.data?.invoice_url) {
         return badRequest('PLISIO_ERROR', String(plisioRes?.data?.message || 'فشل إنشاء الفاتورة'))

@@ -7,6 +7,7 @@ import { CartDrawer } from './components/CartDrawer'
 import { ToastContainer } from './components/ui/ToastContainer'
 import { HomePage } from './pages/HomePage'
 import { CheckoutPage } from './pages/CheckoutPage'
+import { PaymentPage } from './pages/PaymentPage'
 import { TrackOrderPage } from './pages/TrackOrderPage'
 import { InvoicePage } from './pages/InvoicePage'
 import { PaymentMethodsPage } from './pages/PaymentMethodsPage'
@@ -31,6 +32,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/pay/:orderId" element={<PaymentPage />} />
               <Route path="/track" element={<TrackOrderPage />} />
               <Route path="/track/:orderId" element={<TrackOrderPage />} />
               <Route path="/invoice/:orderId" element={<InvoicePage />} />
