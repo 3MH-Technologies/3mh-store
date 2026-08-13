@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import {
   Loader2,
@@ -210,9 +210,9 @@ export function AdminSettingsTab({ className = '' }: { className?: string }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       notify(
-        msg.includes('NO_GITHUB_CONFIG')
-          ? 'قاعدة البيانات غير مهيأة — اضبط GITHUB_* أولاً'
-          : 'تعذر حفظ الإعدادات',
+        msg.includes('UNAUTHORIZED')
+          ? 'انتهت صلاحية الجلسة، سجّل الدخول مجدداً'
+          : 'تعذر حفظ الإعدادات، حاول مرة أخرى',
         'error'
       )
     } finally {
@@ -333,12 +333,10 @@ export function AdminSettingsTab({ className = '' }: { className?: string }) {
             />
           </Field>
         </div>
-        <p className="mt-4 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] leading-5 text-slate-500">
-          رقم PIN الخاص بلوحة التحكم يُدار عبر متغير البيئة{' '}
-          <code dir="ltr" className="text-cyan-300">
-            VITE_ADMIN_PIN
-          </code>{' '}
-          ولا يُخزَّن في قاعدة البيانات العامة لأسباب أمنية.
+        <p className='mt-4 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] leading-5 text-slate-500'>
+          رمز الدخول للوحة التحكم يُدار على الخادم عبر متغير البيئة{' '}
+          <code dir='ltr' className='text-cyan-300'>ADMIN_PIN</code>{' '}
+          ولا يظهر في المتصفح أبداً.
         </p>
       </section>
 

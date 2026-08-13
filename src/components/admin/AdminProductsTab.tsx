@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Check,
@@ -13,8 +13,6 @@ import type { Product } from '../../types'
 import { ICONS } from '../../lib/icons'
 import { formatUSD } from '../../lib/format'
 import { useStore } from '../../context/StoreContext'
-import { CONFIG } from '../../config'
-import { encryptPayload } from '../../lib/crypto'
 import { Modal } from '../ui/Modal'
 
 const GRADIENTS = [
@@ -48,6 +46,8 @@ interface Draft {
 }
 
 function toDraft(p: Product): Draft {
+  const plain =
+    p.access?.payload && !p.access.iv ? p.access.payload : ''
   return {
     id: p.id,
     name: p.name,
@@ -62,7 +62,7 @@ function toDraft(p: Product): Draft {
     sales: String(p.sales),
     rating: String(p.rating),
     accessLabel: p.access?.label ?? '',
-    accessPayload: p.access?.payload ?? '',
+    accessPayload: plain,
   }
 }
 
@@ -123,31 +123,20 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
         `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 
       const payload = draft.accessPayload.trim()
-      let access = editingId
-        ? products.find((p) => p.id === editingId)?.access ?? {
-            label: '',
-            payload: '',
-            iv: '',
-          }
-        : { label: '', payload: '', iv: '' }
-
-      if (payload && payload !== access.payload) {
-        const plain = JSON.stringify({
-          label: draft.accessLabel.trim() || 'الملف الرقمي',
-          desc: '',
-          link: payload,
-        })
-        const encrypted = await encryptPayload(
-          plain,
-          `${CONFIG.assets.saltDomain}${id}`
-        )
+      const existing = editingId
+        ? products.find((p) => p.id === editingId)
+        : null
+      let access: { label: string; payload: string; iv: string }
+      if (payload) {
         access = {
-          label: encrypted.label || draft.accessLabel.trim() || 'الملف الرقمي',
-          payload: encrypted.payload,
-          iv: encrypted.iv,
+          label: draft.accessLabel.trim() || 'ملف الاستلام',
+          payload,
+          iv: '',
         }
+      } else if (existing?.access?.payload) {
+        access = { ...existing.access }
       } else {
-        access = { ...access, label: draft.accessLabel.trim() || access.label }
+        access = { label: draft.accessLabel.trim(), payload: '', iv: '' }
       }
 
       const product: Product = {
@@ -179,9 +168,9 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       notify(
-        msg.includes('NO_GITHUB_CONFIG')
-          ? 'قاعدة البيانات غير مهيأة — اضبط GITHUB_* أولاً'
-          : 'تعذر الحفظ',
+        msg.includes('UNAUTHORIZED')
+          ? 'انتهت صلاحية الجلسة، سجّل الدخول مجدداً'
+          : 'تعذر حفظ التغييرات، حاول مرة أخرى',
         'error'
       )
     } finally {
@@ -199,9 +188,9 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
       notify(
-        msg.includes('NO_GITHUB_CONFIG')
-          ? 'قاعدة البيانات غير مهيأة — اضبط GITHUB_* أولاً'
-          : 'تعذر الحذف',
+        msg.includes('UNAUTHORIZED')
+          ? 'انتهت صلاحية الجلسة، سجّل الدخول مجدداً'
+          : 'تعذر حفظ التغييرات، حاول مرة أخرى',
         'error'
       )
     } finally {

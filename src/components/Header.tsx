@@ -1,5 +1,5 @@
 ﻿import { Link, useNavigate } from 'react-router-dom'
-import { Search, ShoppingCart, Wrench } from 'lucide-react'
+import { Search, ShoppingCart } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import { Logo } from './ui/Logo'
 
@@ -54,13 +54,6 @@ export function Header() {
           >
             <Search className="h-4 w-4" />
           </button>
-          <Link
-            to="/admin"
-            aria-label="لوحة التحكم"
-            className="hidden rounded-xl border border-slate-700 p-2.5 text-slate-300 transition-colors hover:border-purple-400/50 hover:text-purple-300 sm:inline-flex"
-          >
-            <Wrench className="h-4 w-4" />
-          </Link>
           <button
             type="button"
             onClick={() => setCartOpen(true)}

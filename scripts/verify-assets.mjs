@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
+﻿import { readFileSync } from 'node:fs'
 
-const secret = process.env.VITE_ASSET_SECRET || '3mh-store-assets-change-me-2026'
+const secret = process.env.ASSET_SECRET || process.env.VITE_ASSET_SECRET || ''
 const SALT_DOMAIN = '3mh-store.salt.v1'
 const data = JSON.parse(readFileSync(new URL('../data/products.json', import.meta.url), 'utf-8'))
 
@@ -11,7 +11,7 @@ async function decrypt(product) {
   const salt = enc.encode(SALT_DOMAIN + product.id)
   const base = await crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveKey'])
   const key = await crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
     base,
     { name: 'AES-GCM', length: 256 },
     false,

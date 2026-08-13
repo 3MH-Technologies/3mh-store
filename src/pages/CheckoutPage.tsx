@@ -21,9 +21,9 @@ import {
 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import type { PaymentMethod } from '../types'
-import { computeOrderTotals, buildOrder, paymentMethodLabel } from '../lib/orders'
+import { computeOrderTotals, paymentMethodLabel } from '../lib/orders'
 import { formatSAR, formatUSD, isValidEmail } from '../lib/format'
-import { githubDB } from '../lib/github'
+import { api } from '../lib/api'
 import type { Order } from '../types'
 
 type Step = 'info' | 'pay' | 'submit' | 'done'
@@ -171,8 +171,11 @@ export function CheckoutPage() {
     setSubmitting(true)
     setLastAttempt(Date.now())
     try {
-      const order = buildOrder({
-        items: cart,
+      const order = await api.createOrder({
+        items: cart.map((item) => ({
+          productId: item.product.id,
+          qty: item.qty,
+        })),
         customer: {
           name: form.name.trim(),
           email: form.email.trim(),
@@ -182,22 +185,29 @@ export function CheckoutPage() {
         paymentMethod: method,
         txHash: cleanHash,
         receiptDataUrl: receiptFile,
-        deliveryType: settings.deliveryNote,
         notes,
+        honeypot: form.honeypot,
       })
-      await githubDB.addOrder(order)
       setCreatedOrder(order)
       clearCart()
       setStep('done')
-      notify(`تم إنشاء الطلب ${order.id} بنجاح`, 'success')
+      notify(`تم إنشاء طلبك بنجاح رقم ${order.id}`, 'success')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'تعذر إرسال الطلب'
+      const msg = err instanceof Error ? err.message : 'حدث خطأ غير متوقع'
       if (msg.includes('NO_GITHUB_CONFIG')) {
         setWalletError(
-          'قاعدة البيانات غير مهيأة بعد — اربط متغيرات GITHUB_OWNER / REPO / TOKEN ثم أعد المحاولة'
+          'عذراً، المتجر غير مهيأ حالياً. يرجى المحاولة لاحقاً'
+        )
+      } else if (msg.includes('RATE_LIMITED')) {
+        setWalletError(
+          'طلبات كثيرة جداً خلال فترة قصيرة. انتظر قليلاً ثم أعد المحاولة'
+        )
+      } else if (msg.includes('ORDER_REJECTED')) {
+        setWalletError(
+          'تعذر تأكيد الطلب في الوقت الحالي. يرجى المحاولة بعد قليل'
         )
       } else {
-        setWalletError(`تعذر حفظ الطلب: ${msg} — أعد المحاولة`)
+        setWalletError(`حدث خطأ أثناء إرسال الطلب: ${msg} ؟ يرجى المحاولة مرة أخرى`)
       }
     } finally {
       setSubmitting(false)

@@ -1,10 +1,10 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+﻿import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const productsPath = join(root, 'data', 'products.json')
-const secret = process.env.VITE_ASSET_SECRET || '3mh-store-assets-change-me-2026'
+const secret = process.env.ASSET_SECRET || process.env.VITE_ASSET_SECRET || ''
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -18,7 +18,7 @@ async function deriveKey(salt) {
     ['deriveKey']
   )
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
     base,
     { name: 'AES-GCM', length: 256 },
     false,

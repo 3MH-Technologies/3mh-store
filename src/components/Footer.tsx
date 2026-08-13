@@ -44,11 +44,6 @@ export function Footer() {
                 تتبع طلبك
               </Link>
             </li>
-            <li>
-              <Link to="/admin" className="transition-colors hover:text-cyan-300">
-                لوحة التحكم
-              </Link>
-            </li>
           </ul>
         </div>
 

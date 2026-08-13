@@ -8,14 +8,14 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import type { CartItem, Product, ProductsFile, SiteSettings, SettingsFile } from '../types'
+import type { CartItem, Product, SiteSettings } from '../types'
 import { CONFIG } from '../config'
-import { githubDB } from '../lib/github'
-import { whenConfigReady } from '../lib/runtimeConfig'
+import { api, getAdminToken } from '../lib/api'
 import { normalizeProductsFile } from '../lib/products'
 import { clampQty } from '../lib/format'
 import staticProductsData from '../../data/products.json'
 import staticSettingsData from '../../data/settings.json'
+import type { ProductsFile, SettingsFile } from '../types'
 
 interface Toast {
   id: number
@@ -50,8 +50,7 @@ const bundledProducts = normalizeProductsFile(
   staticProductsData as unknown as ProductsFile
 )
 
-const bundledSettings: SiteSettings =
-  (staticSettingsData as unknown as SettingsFile).settings
+const bundledSettings: SiteSettings = (staticSettingsData as unknown as SettingsFile).settings
 
 function normalizeSettings(s: SiteSettings): SiteSettings {
   return {
@@ -136,47 +135,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     []
   )
 
-  const refreshProducts = useCallback(async () => {
-    await whenConfigReady()
+  const refreshCatalog = useCallback(async () => {
     try {
-      const remote = await githubDB.readProducts()
-      if (remote && Array.isArray(remote.products) && remote.products.length > 0) {
-        setProducts(normalizeProducts(remote.products))
+      const remote = await api.getCatalog()
+      const list = normalizeProductsFile(remote.products)
+      if (list.length > 0) {
+        setProducts(list)
         setProductsSource('github')
       }
-    } catch {
-      // في حال تعذر الاتصال بقاعدة البيانات يبقى الكتالوج المحلي نشطًا
-    }
-  }, [])
-
-  const reloadSettings = useCallback(async () => {
-    await whenConfigReady()
-    try {
-      const remote = await githubDB.readSettings()
-      if (remote && remote.settings) {
+      if (remote.settings) {
         setSettings(normalizeSettings(remote.settings))
         setSettingsSource('github')
         CONFIG.usdToSar = Number(remote.settings.usdToSar) || CONFIG.usdToSar
       }
     } catch {
-      // نكمل بالإعدادات المحلية المضمّنة
+      // يبقى الكتالوج المضمّن نشطاً عند تعذر الاتصال بالخادم
     }
   }, [])
 
   useEffect(() => {
-    void refreshProducts()
-    void reloadSettings()
-  }, [refreshProducts, reloadSettings])
+    void refreshCatalog()
+  }, [refreshCatalog])
+
+  const refreshProducts = useCallback(async () => {
+    await refreshCatalog()
+  }, [refreshCatalog])
+
+  const reloadSettings = useCallback(async () => {
+    await refreshCatalog()
+  }, [refreshCatalog])
 
   const saveProducts = useCallback(
     async (list: Product[]) => {
-      await whenConfigReady()
-      await githubDB.writeProducts({
-        version: 1,
-        updatedAt: new Date().toISOString(),
-        currency: 'USD',
-        products: list,
-      })
+      const token = getAdminToken()
+      if (!token) throw new Error('NO_ADMIN_TOKEN')
+      await api.saveProducts(token, list)
       setProducts(normalizeProducts(list))
       setProductsSource('github')
     },
@@ -184,12 +177,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   )
 
   const saveSettings = useCallback(async (next: SiteSettings) => {
-    await whenConfigReady()
-    await githubDB.writeSettings({
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      settings: next,
-    })
+    const token = getAdminToken()
+    if (!token) throw new Error('NO_ADMIN_TOKEN')
+    await api.saveSettings(token, next)
     setSettings(normalizeSettings(next))
     setSettingsSource('github')
     CONFIG.usdToSar = Number(next.usdToSar) || CONFIG.usdToSar

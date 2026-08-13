@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react'
-import { githubDB } from '../lib/github'
+import { api } from '../lib/api'
 import { getProductsByIds } from '../lib/products'
 import { useStore } from '../context/StoreContext'
 import type { Order } from '../types'
@@ -22,7 +22,6 @@ import {
 } from '../lib/orders'
 import { formatDate, formatUSD, isValidOrderId } from '../lib/format'
 import { PageLoader } from '../components/Spinner'
-import { decryptAccess } from '../lib/crypto'
 
 interface AssetLink {
   productId: string
@@ -52,7 +51,7 @@ export function TrackOrderPage() {
   const fetchOrder = async (id: string) => {
     setStatus('loading')
     try {
-      const found = await githubDB.findOrder(id)
+      const found = await api.getOrder(id)
       if (found) {
         setOrder(found)
         setStatus('found')
@@ -95,13 +94,13 @@ export function TrackOrderPage() {
         for (const pid of productIds) {
           const product = catalog.find((p) => p.id === pid)
           if (!product) continue
-          const decrypted = await decryptAccess(product.access, product.id)
-          if (decrypted.link) {
+          const asset = await api.getAccess(order.id, pid)
+          if (asset?.link) {
             results.push({
               productId: pid,
-              label: decrypted.label,
-              desc: decrypted.desc,
-              link: decrypted.link,
+              label: asset.label,
+              desc: asset.desc,
+              link: asset.link,
             })
           }
         }

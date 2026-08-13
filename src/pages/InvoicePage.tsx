@@ -8,12 +8,12 @@ import {
   LockKeyhole,
   Printer,
   ShieldCheck,
+  XCircle,
 } from 'lucide-react'
-import { githubDB } from '../lib/github'
+import { api } from '../lib/api'
 import { getProductsByIds } from '../lib/products'
 import { useStore } from '../context/StoreContext'
-import { decryptAccess } from '../lib/crypto'
-import type { Order, SiteSettings } from '../types'
+import type { Order } from '../types'
 import {
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
@@ -37,22 +37,23 @@ export function InvoicePage() {
   const [missing, setMissing] = useState(false)
   const [assets, setAssets] = useState<InvoiceAsset[]>([])
   const [decrypting, setDecrypting] = useState(false)
+  const [decryptError, setDecryptError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    if (!orderId) {
-      setMissing(true)
-      setLoading(false)
-      return
-    }
     void (async () => {
+      if (!orderId) {
+        setMissing(true)
+        setLoading(false)
+        return
+      }
       try {
-        const found = await githubDB.findOrder(orderId)
+        const found = await api.getOrder(orderId)
+        if (cancelled) return
         if (found) {
-          if (!cancelled) setOrder(found)
-          if (!cancelled) setMissing(false)
+          setOrder(found)
         } else {
-          if (!cancelled) setMissing(true)
+          setMissing(true)
         }
       } catch {
         if (!cancelled) setMissing(true)
@@ -65,336 +66,290 @@ export function InvoicePage() {
     }
   }, [orderId])
 
+  const productIds = order ? order.items.map((i) => i.productId) : []
+
   useEffect(() => {
     let cancelled = false
-    if (!order || order.status !== 'verified') {
+    if (order && order.status === 'verified' && productIds.length > 0) {
+      setDecrypting(true)
+      setDecryptError('')
+      void (async () => {
+        try {
+          const catalog = getProductsByIds(products, productIds)
+          const results: InvoiceAsset[] = []
+          for (const pid of productIds) {
+            const product = catalog.find((p) => p.id === pid)
+            if (!product) continue
+            const asset = await api.getAccess(order.id, pid)
+            if (asset?.link) {
+              results.push({
+                productId: pid,
+                label: asset.label,
+                desc: asset.desc,
+                link: asset.link,
+              })
+            }
+          }
+          if (!cancelled) setAssets(results)
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : ''
+          if (!cancelled && !msg.includes('NOT_VERIFIED')) {
+            setDecryptError('ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ù…Ù„ÙØ§Øª Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù… Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰')
+          }
+        } finally {
+          if (!cancelled) setDecrypting(false)
+        }
+      })()
+    } else {
       setAssets([])
       setDecrypting(false)
-      return
     }
-    setDecrypting(true)
-    void (async () => {
-      const catalog = getProductsByIds(
-        products,
-        order.items.map((i) => i.productId)
-      )
-      const results: InvoiceAsset[] = []
-      for (const item of order.items) {
-        const product = catalog.find((p) => p.id === item.productId)
-        if (!product) continue
-        const decrypted = await decryptAccess(product.access, product.id)
-        if (decrypted.link) {
-          results.push({
-            productId: product.id,
-            label: decrypted.label,
-            desc: decrypted.desc,
-            link: decrypted.link,
-          })
-        }
-      }
-      if (!cancelled) setAssets(results)
-      if (!cancelled) setDecrypting(false)
-    })()
     return () => {
       cancelled = true
     }
-  }, [order, products])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status, products])
 
-  if (loading) return <PageLoader label="ÌÇÑò ÊÍãíá ÇáİÇÊæÑÉ..." />
+  const copyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const printInvoice = () => {
+    window.print()
+  }
+
+  if (loading) {
+    return <PageLoader label="Ø¬Ø§Ø±Ù ØªØ­Ù…ÙŠÙ„ Ø§Ù„ÙØ§ØªÙˆØ±Ø©..." />
+  }
 
   if (missing || !order) {
     return (
-      <div className="container-app max-w-md py-20 text-center">
+      <div className="container-app py-20 text-center">
         <FileText className="mx-auto h-12 w-12 text-slate-600" />
-        <h1 className="mt-4 text-xl font-black text-white">İÇÊæÑÉ ÛíÑ ãæÌæÏÉ</h1>
+        <h1 className="mt-4 text-xl font-black text-white">
+          Ù„Ù… Ù†Ø¹Ø«Ø± Ø¹Ù„Ù‰ Ù‡Ø°Ù‡ Ø§Ù„ÙØ§ØªÙˆØ±Ø©
+        </h1>
         <p className="mt-2 text-sm text-slate-400">
-          áÇ ÊæÌÏ İÇÊæÑÉ ÈåĞÇ ÇáÑŞã¡ ÊÃßÏ ãä ÇáÑÇÈØ Ãæ ÊæÇÕá ãÚ ÇáÏÚã.
+          ØªØ£ÙƒØ¯ Ù…Ù† Ø±Ø§Ø¨Ø· Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø£Ùˆ Ø¬Ø±Ù‘Ø¨ Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ø·Ù„Ø¨Ùƒ Ù…Ù† ØµÙØ­Ø© ØªØªØ¨Ø¹ Ø§Ù„Ø·Ù„Ø¨.
         </p>
         <Link to="/track" className="btn-primary mt-6">
-          ÊÊÈÚ ØáÈß
+          ØªØªØ¨Ø¹ Ø§Ù„Ø·Ù„Ø¨
         </Link>
       </div>
     )
   }
 
-  const verified = order.status === 'verified'
+  const statusColors = ORDER_STATUS_COLORS[order.status]
+  const statusLabel = ORDER_STATUS_LABELS[order.status]
 
   return (
-    <div className="container-app max-w-4xl py-10">
-      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-white">ÇáİÇÊæÑÉ ÇáÑŞãíÉ</h1>
-          <p className="mt-1 text-xs text-slate-400">
-            İÇÊæÑÉ ÑÓãíÉ ŞÇÈáÉ ááØÈÇÚÉ æÇáÊÍãíá PDF
-          </p>
-        </div>
+    <div className="container-app max-w-3xl py-10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-black text-white">ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø·Ù„Ø¨</h1>
         <div className="flex gap-2">
-          <button type="button" className="btn-ghost" onClick={() => window.print()}>
-            <Printer className="h-4 w-4" />
-            ØÈÇÚÉ / PDF
+          <button
+            onClick={printInvoice}
+            className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-cyan-400/40 hover:text-cyan-300"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Ø·Ø¨Ø§Ø¹Ø©
           </button>
-          <Link to={`/track/${order.id}`} className="btn-ghost">
-            ÊÊÈÚ ÇáØáÈ
+          <Link
+            to="/track"
+            className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-cyan-400/40 hover:text-cyan-300"
+          >
+            ØªØªØ¨Ø¹ Ø·Ù„Ø¨ Ø¢Ø®Ø±
           </Link>
         </div>
       </div>
 
-      <div className="print-area card overflow-hidden p-0">
-        <InvoiceHeader order={order} settings={settings} />
-        <InvoiceBody order={order} settings={settings} />
-        {verified ? (
-          <InvoiceAssets
-            assets={assets}
-            decrypting={decrypting}
-            orderId={order.id}
-          />
-        ) : (
-          <div className="print-dark border-t border-slate-800 p-6 sm:p-8">
-            <div className="flex items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/5 p-4">
-              <LockKeyhole className="h-5 w-5 shrink-0 text-amber-300" />
-              <div className="text-xs leading-6 text-slate-300">
-                <p className="font-bold text-amber-200">ÑæÇÈØ ÇáÊÓáíã ãŞİáÉ</p>
-                <p>
-                  ÊõİÊÍ ÑæÇÈØ ÇáÃÕæá ÊáŞÇÆíÇğ İí åĞå ÇáİÇÊæÑÉ İæÑ ÇáÊÍŞŞ ãä
-                  ÚãáíÉ ÇáÏİÚ — ÇáÍÇáÉ ÇáÍÇáíÉ:{' '}
-                  {ORDER_STATUS_LABELS[order.status]}.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        <InvoiceFooter settings={settings} />
-      </div>
-    </div>
-  )
-}
-
-function InvoiceHeader({ order, settings }: { order: Order; settings: SiteSettings }) {
-  return (
-    <div className="border-b border-slate-800 p-6 sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 text-lg font-black text-white">
-              3
-            </span>
-            <div>
-              <p className="text-sm font-black tracking-wide text-white">
-                {settings.companyName}
-              </p>
-              <p className="text-[11px] text-slate-400">
-                {settings.appNameAr} — {settings.appName}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 space-y-1 text-xs text-slate-400">
-            <p>
-              ÈÑíÏ ÇáÏÚã: <span dir="ltr">{settings.supportEmail}</span>
+      <div className="card mt-5 p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-500">Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨</p>
+            <p className="mt-1 font-mono text-lg font-black tracking-widest text-white">
+              {order.id}
             </p>
-            <p>
-              ÊíáíÌÑÇã:{' '}
-              <a
-                href={`https://t.me/${settings.supportTelegramUsername}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cyan-400 hover:underline"
-                dir="ltr"
-              >
-                @{settings.supportTelegramUsername}
-              </a>
-            </p>
+            <p className="mt-2 text-xs text-slate-500">{formatDate(order.createdAt)}</p>
           </div>
-        </div>
-
-        <div className="text-end">
-          <p className="text-xs font-bold text-slate-500">İÇÊæÑÉ ÅáßÊÑæäíÉ</p>
-          <p className="mt-1 font-mono text-lg font-black tracking-wider text-white" dir="ltr">
-            {order.id}
-          </p>
-          <p className="mt-2 text-xs text-slate-400">
-            ÊÇÑíÎ ÇáÅäÔÇÁ: {formatDate(order.createdAt)}
-          </p>
-          {order.verifiedAt && (
-            <p className="mt-0.5 text-xs text-slate-400">
-              ÊÇÑíÎ ÇáÊÍŞŞ: {formatDate(order.verifiedAt)}
-            </p>
-          )}
           <span
-            className={`chip mt-3 border ${ORDER_STATUS_COLORS[order.status]}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${statusColors}`}
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            {ORDER_STATUS_LABELS[order.status]}
+            {order.status === 'verified' ? (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            ) : order.status === 'rejected' ? (
+              <XCircle className="h-3.5 w-3.5" />
+            ) : (
+              <LockKeyhole className="h-3.5 w-3.5" />
+            )}
+            {statusLabel}
           </span>
         </div>
-      </div>
-    </div>
-  )
-}
 
-function InvoiceBody({ order, settings }: { order: Order; settings: SiteSettings }) {
-  return (
-    <div className="p-6 sm:p-8">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <p className="mb-2 text-xs font-bold text-slate-500">ÈíÇäÇÊ ÇáÚãíá</p>
-          <div className="space-y-1 text-sm text-slate-200">
-            <p className="font-extrabold">{order.customer.name}</p>
-            <p dir="ltr" className="text-start text-xs">
-              {order.customer.email}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+            <p className="text-xs font-bold text-cyan-300">Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„</p>
+            <p className="mt-2 text-sm font-bold text-white">{order.customer.name}</p>
+            {order.customer.email && (
+              <p className="mt-1 text-xs text-slate-400" dir="ltr">
+                {order.customer.email}
+              </p>
+            )}
+            {order.customer.telegram && (
+              <p className="mt-1 text-xs text-slate-400">ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù…: {order.customer.telegram}</p>
+            )}
+            {order.customer.phone && (
+              <p className="mt-1 text-xs text-slate-400">Ø§Ù„Ù‡Ø§ØªÙ: {order.customer.phone}</p>
+            )}
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+            <p className="text-xs font-bold text-cyan-300">Ø§Ù„Ø¯ÙØ¹</p>
+            <p className="mt-2 text-sm font-bold text-white">
+              {paymentMethodLabel(order.payment.method, settings.paymentMethodLabels)}
             </p>
-            <p dir="ltr" className="text-start text-xs">
-              {order.customer.telegram || order.customer.phone || '—'}
+            <p className="mt-1 text-xs text-slate-400" dir="ltr">
+              {order.payment.txHash}
             </p>
+            {order.payment.receiptDataUrl && (
+              <img
+                src={order.payment.receiptDataUrl}
+                alt="Ø¥ÙŠØµØ§Ù„ Ø§Ù„Ø¯ÙØ¹"
+                className="mt-3 max-h-40 rounded-lg border border-slate-800"
+              />
+            )}
           </div>
         </div>
-        <div className="sm:text-end">
-          <p className="mb-2 text-xs font-bold text-slate-500">ÈíÇäÇÊ ÇáÏİÚ</p>
-          <div className="space-y-1 text-xs text-slate-300">
-            <p>
-              ÇáØÑíŞÉ: <b>{paymentMethodLabel(order.payment.method, settings.paymentMethodLabels)}</b>
-            </p>
-            <p className="break-all">
-              ãÚÑİ ÇáÚãáíÉ:{' '}
-              <code dir="ltr" className="text-cyan-300">
-                {order.payment.txHash}
-              </code>
-            </p>
-            <p>äæÚ ÇáÊÓáíã: {order.deliveryType}</p>
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-slate-900/70 text-slate-400">
-              <th className="px-4 py-3 text-start font-bold">ÇáãäÊÌ</th>
-              <th className="px-4 py-3 text-center font-bold">ÇáßãíÉ</th>
-              <th className="px-4 py-3 text-end font-bold">ÇáÓÚÑ</th>
-              <th className="px-4 py-3 text-end font-bold">ÇáÅÌãÇáí</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {order.items.map((item) => (
-              <tr key={item.productId} className="text-slate-300">
-                <td className="px-4 py-3 font-bold text-slate-200">
-                  {item.title}
-                </td>
-                <td className="px-4 py-3 text-center">{item.qty}</td>
-                <td className="px-4 py-3 text-end">{formatUSD(item.price)}</td>
-                <td className="px-4 py-3 text-end font-black text-white">
-                  {formatUSD(item.price * item.qty)}
-                </td>
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-800 text-xs text-slate-500">
+                <th className="px-4 py-2 text-start font-bold">Ø§Ù„Ù…Ù†ØªØ¬</th>
+                <th className="px-4 py-2 text-center font-bold">Ø§Ù„ÙƒÙ…ÙŠØ©</th>
+                <th className="px-4 py-2 text-end font-bold">Ø§Ù„Ø³Ø¹Ø±</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-4 ms-auto w-full max-w-xs space-y-2 text-xs">
-        <div className="flex justify-between text-slate-400">
-          <span>ÇáÅÌãÇáí ÇáİÑÚí</span>
-          <span className="font-bold text-slate-200">{formatUSD(order.subtotal)}</span>
+            </thead>
+            <tbody>
+              {order.items.map((item) => (
+                <tr key={item.productId} className="border-b border-slate-800/60">
+                  <td className="px-4 py-3 font-bold text-slate-200">{item.title}</td>
+                  <td className="px-4 py-3 text-center text-slate-400">{item.qty}</td>
+                  <td className="px-4 py-3 text-end text-slate-200">
+                    {formatUSD(item.price)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        {order.discount > 0 && (
-          <div className="flex justify-between text-slate-400">
-            <span>ÎÕã ÊÑæíÌí</span>
-            <span className="font-bold text-emerald-400">
-              ? {formatUSD(order.discount)}
-            </span>
+
+        <div className="mt-4 flex flex-col items-end gap-1 text-sm">
+          <p className="text-slate-400">
+            Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ: <b className="text-slate-200">{formatUSD(order.subtotal)}</b>
+          </p>
+          {order.discount > 0 && (
+            <p className="text-emerald-400">
+              Ø§Ù„Ø®ØµÙ…: -{formatUSD(order.discount)}
+            </p>
+          )}
+          <p className="text-lg font-black text-white">
+            Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ: {formatUSD(order.total)}
+          </p>
+          <p className="text-xs text-slate-400">â‰ˆ {formatSAR(order.total)}</p>
+        </div>
+
+        {order.status === 'verified' && (
+          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+            <div className="flex items-center gap-2 text-emerald-300">
+              <ShieldCheck className="h-5 w-5" />
+              <h2 className="font-black">Ù…Ù„ÙØ§Øª Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù… Ø¬Ø§Ù‡Ø²Ø©</h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Ø·Ù„Ø¨Ùƒ Ù…Ø¤ÙƒØ¯ Ø¨Ù†Ø¬Ø§Ø­ØŒ Ø¥Ù„ÙŠÙƒ ÙƒÙ„ Ù…Ø§ Ø§Ø´ØªØ±ÙŠØªÙ‡.
+            </p>
+            {decrypting ? (
+              <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
+                Ø¬Ø§Ø±Ù ØªØ¬Ù‡ÙŠØ² Ø§Ù„Ù…Ù„ÙØ§Øª...
+              </div>
+            ) : assets.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {assets.map((asset) => (
+                  <div
+                    key={asset.productId}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/20 bg-slate-900/60 p-3"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-white">{asset.label}</p>
+                      {asset.desc && (
+                        <p className="mt-0.5 text-xs text-slate-400">{asset.desc}</p>
+                      )}
+                    </div>
+                    <a
+                      href={asset.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-black text-slate-950 transition hover:bg-emerald-400"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      ØªØ­Ù…ÙŠÙ„
+                    </a>
+                    <button
+                      onClick={() => void copyLink(asset.link)}
+                      className="rounded-lg border border-emerald-500/30 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/10"
+                    >
+                      Ù†Ø³Ø® Ø§Ù„Ø±Ø§Ø¨Ø·
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500">
+                {decryptError ||
+                  'Ù„Ù… Ù†Ø¬Ø¯ Ù…Ù„ÙØ§Øª Ø§Ø³ØªÙ„Ø§Ù… Ù„Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§ Ø¥Ù† Ø§Ø­ØªØ¬Øª Ù…Ø³Ø§Ø¹Ø¯Ø©.'}
+              </p>
+            )}
           </div>
         )}
-        <div className="flex justify-between text-slate-400">
-          <span>ÇáÊæÕíá</span>
-          <span className="font-bold text-emerald-400">ãÌÇäí</span>
-        </div>
-        <div className="flex justify-between border-t border-slate-800 pt-2 text-sm">
-          <span className="font-extrabold text-white">ÇáÅÌãÇáí ÇáäåÇÆí</span>
-          <div className="text-end">
-            <p className="font-black text-white">{formatUSD(order.total)}</p>
-            <p className="text-[11px] font-bold text-cyan-300">
-              ? {formatSAR(order.total)}
+
+        {order.status === 'pending' && (
+          <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
+            <div className="flex items-center gap-2 text-amber-300">
+              <LockKeyhole className="h-5 w-5" />
+              <h2 className="font-black">Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„ØªØ£ÙƒÙŠØ¯</h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Ø³Ù†Ø±Ø§Ø¬Ø¹ Ø·Ù„Ø¨Ùƒ ÙˆÙ†Ø¤ÙƒØ¯Ù‡ Ù‚Ø±ÙŠØ¨Ø§Ù‹ØŒ ÙˆØ¹Ù†Ø¯Ù‡Ø§ Ø³ØªØ¬Ø¯ Ù…Ù„ÙØ§Øª Ø§Ù„Ø§Ø³ØªÙ„Ø§Ù… ÙÙŠ Ù‡Ø°Ù‡ Ø§Ù„ØµÙØ­Ø©.
             </p>
           </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function InvoiceAssets({
-  assets,
-  decrypting,
-  orderId,
-}: {
-  assets: InvoiceAsset[]
-  decrypting: boolean
-  orderId: string
-}) {
-  return (
-    <div className="border-t border-slate-800 p-6 sm:p-8">
-      <div className="flex items-center gap-3">
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400" />
-        <div>
-          <p className="text-sm font-extrabold text-emerald-300">
-            Êã ÇáÊÍŞŞ — ÑæÇÈØ ÇáÃÕæá ãİÚáÉ
-          </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            åĞå ÇáİÇÊæÑÉ ãæËŞÉ ÈÑŞã ÇáÊÍŞŞ {orderId} áÏì İÑíŞ 3MH TECHNOLOGIES.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        {decrypting ? (
-          <div className="flex items-center gap-2 py-4 text-xs text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            ÌÇÑò İß ÊÔİíÑ ÑæÇÈØ ÇáÊÓáíã...
-          </div>
-        ) : assets.length > 0 ? (
-          assets.map((asset) => (
-            <div
-              key={asset.productId}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/50 p-4"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-extrabold text-white">{asset.label}</p>
-                {asset.desc && (
-                  <p className="mt-0.5 text-[11px] text-slate-400">{asset.desc}</p>
-                )}
-              </div>
-              <a
-                href={asset.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-primary shrink-0 px-4 py-2 text-xs"
-              >
-                <Download className="h-4 w-4" />
-                ÊÍãíá ÇáÃÕæá
-              </a>
-            </div>
-          ))
-        ) : (
-          <p className="py-3 text-xs text-slate-400">
-            áÇ ÊÊæİÑ ÑæÇÈØ ÊÍãíá áåĞå ÇáÃÕæá¡ ÊæÇÕá ãÚ ÇáÏÚã.
-          </p>
         )}
-      </div>
-    </div>
-  )
-}
 
-function InvoiceFooter({ settings }: { settings: SiteSettings }) {
-  return (
-    <div className="print-dark border-t border-slate-800 p-6 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          ÔßÑÇğ áËŞÊßã İí {settings.companyName} — ÌãíÚ ÇáãäÊÌÇÊ ãÑÎÕÉ æÊÓáíãåÇ
-          ãæËŞ ÑŞãíÇğ.
-        </p>
-        <p className="text-xs text-slate-500" dir="ltr">
-          {settings.appName} © 2026
-        </p>
+        {order.status === 'rejected' && (
+          <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/5 p-5">
+            <div className="flex items-center gap-2 text-rose-300">
+              <XCircle className="h-5 w-5" />
+              <h2 className="font-black">Ù„Ù… ÙŠØªÙ… ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨</h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              Ù„Ù„Ø£Ø³Ù Ù„Ù… Ù†ØªÙ…ÙƒÙ† Ù…Ù† ØªØ£ÙƒÙŠØ¯ Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ØŒ ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§ Ø¹Ø¨Ø± ØªÙŠÙ„ÙŠØ¬Ø±Ø§Ù…
+              {settings.supportTelegramUsername
+                ? ` ${settings.supportTelegramUsername}`
+                : ''}{' '}
+              Ø¥Ù† ÙƒØ§Ù† Ù„Ø¯ÙŠÙƒ Ø§Ø³ØªÙØ³Ø§Ø±.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-800 pt-4">
+          <p className="text-xs text-slate-500">Ø´ÙƒØ±Ø§Ù‹ Ù„Ø«Ù‚ØªÙƒ Ø¨Ù…ØªØ¬Ø±Ù†Ø§</p>
+          <Link to="/" className="text-xs font-bold text-cyan-300 hover:text-cyan-200">
+            Ø§Ù„Ø¹ÙˆØ¯Ø© Ù„Ù„Ù…ØªØ¬Ø±
+          </Link>
+        </div>
       </div>
     </div>
   )

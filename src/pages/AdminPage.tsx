@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -17,9 +17,8 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { githubDB } from '../lib/github'
+import { api, getAdminToken, setAdminToken } from '../lib/api'
 import type { Order, SiteSettings } from '../types'
-import { CONFIG } from '../config'
 import {
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
@@ -38,14 +37,22 @@ type AdminTab = 'orders' | 'products' | 'settings'
 export function AdminPage() {
   const { notify, settings } = useStore()
   const [authed, setAuthed] = useState(
-    () => sessionStorage.getItem(CONFIG.admin.sessionKey) === '1'
+    () => Boolean(getAdminToken())
   )
 
   if (!authed) {
     return <AdminLogin onSuccess={() => setAuthed(true)} notify={notify} />
   }
-
-  return <AdminDashboard onLogout={() => setAuthed(false)} notify={notify} settings={settings} />
+  return (
+    <AdminDashboard
+      onLogout={() => {
+        setAdminToken(null)
+        setAuthed(false)
+      }}
+      notify={notify}
+      settings={settings}
+    />
+  )
 }
 
 function AdminLogin({
@@ -58,16 +65,27 @@ function AdminLogin({
   const [pin, setPin] = useState('')
   const [show, setShow] = useState(false)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (pin.trim() === CONFIG.admin.pin) {
-      sessionStorage.setItem(CONFIG.admin.sessionKey, '1')
+    setBusy(true)
+    setError('')
+    try {
+      const token = await api.adminLogin(pin.trim())
+      setAdminToken(token)
       onSuccess()
-      notify('مرحباً بك في لوحة التحكم', 'success')
-    } else {
-      setError('كلمة المرور غير صحيحة')
+      notify('تم تسجيل الدخول بنجاح، أهلاً بك', 'success')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('INVALID_PIN')) {
+        setError('رمز الدخول غير صحيح، حاول مرة أخرى')
+      } else {
+        setError('تعذر الاتصال بالخادم حالياً، حاول بعد قليل')
+      }
       setPin('')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -108,8 +126,8 @@ function AdminLogin({
             </button>
           </div>
           {error && <p className="text-xs text-rose-400">{error}</p>}
-          <button type="submit" className="btn-primary w-full">
-            دخول
+          <button type="submit" className="btn-primary w-full" disabled={busy}>
+            {busy ? 'جارِ التحقق...' : 'دخول'}
           </button>
           <Link
             to="/"
@@ -141,17 +159,22 @@ function AdminDashboard({
   const [rejectMode, setRejectMode] = useState(false)
   const [tab, setTab] = useState<AdminTab>('orders')
 
-  const load = async () => {
+const load = async () => {
     setLoading(true)
     try {
-      const list = await githubDB.findAllOrders()
+      const token = getAdminToken()
+      if (!token) {
+        notify('انتهت الجلسة، سجّل الدخول مرة أخرى', 'error')
+        return
+      }
+      const list = await api.listOrders(token)
       setOrders(list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)))
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('NO_GITHUB_CONFIG')) {
-        notify('قم بإعداد متغيرات GITHUB أولاً', 'error')
+      if (msg.includes('UNAUTHORIZED')) {
+        notify('انتهت صلاحية الجلسة، سجّل الدخول مجدداً', 'error')
       } else {
-        notify('تعذر تحميل الطلبات', 'error')
+        notify('تعذر تحميل الطلبات، تحقق من الاتصال', 'error')
       }
     } finally {
       setLoading(false)
@@ -180,25 +203,30 @@ function AdminDashboard({
     [orders]
   )
 
-  const setStatus = async (order: Order, status: Order['status']) => {
+const setStatus = async (order: Order, status: Order['status']) => {
     setBusyId(order.id)
     try {
-      await githubDB.updateOrderStatus(order.id, status)
+      const token = getAdminToken()
+      if (!token) {
+        notify('انتهت الجلسة، سجّل الدخول مرة أخرى', 'error')
+        return
+      }
+      await api.updateOrderStatus(token, order.id, status)
       notify(
         status === 'verified'
-          ? `تم التحقق من الطلب ${order.id}${
-              order.customer.telegram ? ` وأُرسل إلى ${order.customer.telegram}` : ''
-            }`
+          ? `تم تأكيد الطلب ${order.id}${order.customer.telegram ? ` وتم إرسال رابط الاستلام إلى تيليجرام ${order.customer.telegram}` : ''}`
           : `تم رفض الطلب ${order.id}`,
         status === 'verified' ? 'success' : 'info'
       )
       await load()
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('NO_GITHUB_CONFIG')) {
-        notify('قاعدة البيانات غير مهيأة — اضبط GITHUB_* أولاً', 'error')
+      if (msg.includes('UNAUTHORIZED')) {
+        notify('انتهت صلاحية الجلسة، سجّل الدخول مجدداً', 'error')
+      } else if (msg.includes('ORDER_NOT_FOUND')) {
+        notify('الطلب غير موجود', 'error')
       } else {
-        notify('تعذر تحديث الحالة', 'error')
+        notify('تعذر تحديث حالة الطلب', 'error')
       }
     } finally {
       setBusyId(null)

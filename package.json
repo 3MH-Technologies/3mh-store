@@ -9,13 +9,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "server": "node --env-file=.env scripts/server.mjs",
     "seed:assets": "node --env-file=.env scripts/seed-assets.mjs",
     "db:init": "node --env-file=.env scripts/db-init.mjs",
     "verify:assets": "node --env-file=.env scripts/verify-assets.mjs",
     "write:config": "node --env-file=.env scripts/write-config.cjs"
   },
   "dependencies": {
-    "@octokit/rest": "^21.1.1",
     "lucide-react": "^0.469.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

@@ -2,40 +2,10 @@ import { createServer } from 'node:http'
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { join, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { handleApi } from '../server/api.mjs'
 
 const DIST = resolve(fileURLToPath(new URL('../dist/', import.meta.url)))
 const PORT = Number(process.env.PORT || 7860)
-
-const pick = (names) => {
-  for (const name of names) {
-    const value = process.env[name]
-    if (value && value.trim()) return value.trim()
-  }
-  return undefined
-}
-
-function buildConfig() {
-  const patch = {}
-
-  const github = {}
-  const owner = pick(['VITE_GITHUB_OWNER', 'GITHUB_OWNER'])
-  if (owner) github.owner = owner
-  const repo = pick(['VITE_GITHUB_REPO', 'GITHUB_REPO'])
-  if (repo) github.repo = repo
-  const branch = pick(['VITE_GITHUB_BRANCH', 'GITHUB_BRANCH'])
-  if (branch) github.branch = branch
-  const token = pick(['VITE_GITHUB_TOKEN', 'GITHUB_TOKEN'])
-  if (token) github.token = token
-  if (Object.keys(github).length > 0) patch.github = github
-
-  const pin = pick(['VITE_ADMIN_PIN', 'ADMIN_PIN'])
-  if (pin) patch.admin = { pin }
-
-  const secret = pick(['VITE_ASSET_SECRET', 'ASSET_SECRET'])
-  if (secret) patch.assets = { secret }
-
-  return JSON.stringify(patch)
-}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -49,18 +19,83 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
-const server = createServer((req, res) => {
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    req.on('data', (chunk) => {
+      size += chunk.length
+      if (size > 5 * 1024 * 1024) {
+        reject(new Error('BODY_TOO_LARGE'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks).toString('utf-8'))
+    })
+    req.on('error', reject)
+  })
+}
+
+const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`)
 
-  if (url.pathname === '/config.json') {
-    res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' })
-    res.end(buildConfig())
-    return
+  if (url.pathname.startsWith('/api/')) {
+    try {
+      const body = await readBody(req)
+      const forwarded = req.headers['x-forwarded-for']
+      const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
+        ?.split(',')[0]
+        .trim() || req.socket.remoteAddress || 'local'
+      const result = await handleApi({
+        method: req.method,
+        pathname: url.pathname,
+        search: url.searchParams,
+        headers: req.headers,
+        body,
+        env: process.env,
+        ip,
+      })
+      res.writeHead(result.status, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+        ...SECURITY_HEADERS,
+      })
+      res.end(JSON.stringify(result.body))
+      return
+    } catch (err) {
+      res.writeHead(500, {
+        'Content-Type': 'application/json',
+        ...SECURITY_HEADERS,
+      })
+      res.end(JSON.stringify({ error: { code: 'INTERNAL', message: 'خطأ داخلي في الخادم' } }))
+      return
+    }
   }
 
-  let filePath = resolve(join(DIST, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname)))
-  if (!filePath.startsWith(DIST + sep) && filePath !== DIST && !filePath.startsWith(DIST + '/')) {
-    res.writeHead(403)
+  // static SPA
+  let filePath = resolve(
+    join(
+      DIST,
+      url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname)
+    )
+  )
+  if (
+    !filePath.startsWith(DIST + sep) &&
+    filePath !== DIST &&
+    !filePath.startsWith(DIST + '/')
+  ) {
+    res.writeHead(403, SECURITY_HEADERS)
     res.end('Forbidden')
     return
   }
@@ -73,11 +108,14 @@ const server = createServer((req, res) => {
     const body = readFileSync(filePath)
     res.writeHead(200, {
       'Content-Type': MIME[extname(filePath)] ?? 'application/octet-stream',
-      'Cache-Control': url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+      'Cache-Control': url.pathname.startsWith('/assets/')
+        ? 'public, max-age=31536000, immutable'
+        : 'no-cache',
+      ...SECURITY_HEADERS,
     })
     res.end(body)
   } catch {
-    res.writeHead(500)
+    res.writeHead(500, SECURITY_HEADERS)
     res.end('Server error')
   }
 })
