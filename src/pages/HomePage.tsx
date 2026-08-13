@@ -134,7 +134,7 @@ export function HomePage() {
             أربع خطوات تفصلك عن منتجك الرقمي.
           </p>
         </div>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: ShoppingBag,
@@ -161,13 +161,15 @@ export function HomePage() {
               desc: 'عند تأكيد التحقق تُفتح روابط الأصول في الفاتورة فوراً.',
             },
           ].map(({ icon: Icon, step, title, desc }) => (
-            <div key={step} className="relative">
-              <span className="absolute -top-3 right-0 text-4xl font-black text-slate-800">
-                {step}
-              </span>
-              <span className="inline-flex rounded-xl bg-gradient-to-l from-cyan-500/15 to-purple-500/15 p-3">
-                <Icon className="h-5 w-5 text-purple-300" />
-              </span>
+            <div key={step} className="card group relative p-5">
+              <div className="flex items-center justify-between">
+                <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-black tracking-widest text-cyan-300" dir="ltr">
+                  {step}
+                </span>
+                <span className="inline-flex rounded-xl bg-gradient-to-l from-cyan-500/15 to-purple-500/15 p-3 transition-transform group-hover:scale-110">
+                  <Icon className="h-5 w-5 text-purple-300" />
+                </span>
+              </div>
               <h3 className="mt-4 text-sm font-extrabold text-white">{title}</h3>
               <p className="mt-1.5 text-xs leading-6 text-slate-400">{desc}</p>
             </div>

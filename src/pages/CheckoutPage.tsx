@@ -13,6 +13,7 @@ import {
   Mail,
   Phone,
   QrCode,
+  RefreshCw,
   Send,
   ShieldCheck,
   ShoppingCart,
@@ -33,6 +34,7 @@ interface FormState {
   telegram: string
   phone: string
   terms: boolean
+  honeypot: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -41,6 +43,20 @@ const EMPTY_FORM: FormState = {
   telegram: '',
   phone: '',
   terms: false,
+  honeypot: '',
+}
+
+interface Captcha {
+  q: string
+  answer: string
+}
+
+function makeCaptcha(): Captcha {
+  const a = 1 + Math.floor(Math.random() * 9)
+  const b = 1 + Math.floor(Math.random() * 9)
+  const mul = Math.random() < 0.5
+  const answer = mul ? a * b : a + b
+  return { q: mul ? `${a} × ${b}` : `${a} + ${b}`, answer: String(answer) }
 }
 
 export function CheckoutPage() {
@@ -56,6 +72,9 @@ export function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [walletError, setWalletError] = useState('')
+  const [captcha, setCaptcha] = useState<Captcha>(makeCaptcha)
+  const [captchaInput, setCaptchaInput] = useState('')
+  const [lastAttempt, setLastAttempt] = useState(0)
 
   const totals = useMemo(() => computeOrderTotals(cart), [cart])
   const wallet = wallets.find((w) => w.method === method) ?? wallets[0]
@@ -124,6 +143,15 @@ export function CheckoutPage() {
   }
 
   const handleSubmit = async () => {
+    if (form.honeypot.trim()) {
+      clearCart()
+      setStep('done')
+      return
+    }
+    if (Date.now() - lastAttempt < 10000) {
+      setWalletError('انتظر قليلاً قبل إعادة المحاولة')
+      return
+    }
     const cleanHash = txHash.trim()
     if (cleanHash.length < 6) {
       setWalletError('أدخل معرف العملية (TxID) — لا يقل عن 6 أحرف')
@@ -133,8 +161,15 @@ export function CheckoutPage() {
       setWalletError('يجب الموافقة على شروط الاستخدام')
       return
     }
+    if (captchaInput.trim() !== captcha.answer) {
+      setWalletError('إجابة التحقق الأمني غير صحيحة — أعد المحاولة')
+      setCaptcha(makeCaptcha())
+      setCaptchaInput('')
+      return
+    }
     setWalletError('')
     setSubmitting(true)
+    setLastAttempt(Date.now())
     try {
       const order = buildOrder({
         items: cart,
@@ -350,6 +385,16 @@ export function CheckoutPage() {
                 <p className="text-xs text-rose-400">{errors.terms}</p>
               )}
 
+              <input
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="pointer-events-none absolute -left-96 h-px w-px opacity-0"
+                value={form.honeypot}
+                onChange={(e) => setForm({ ...form, honeypot: e.target.value })}
+              />
+
               <button
                 type="button"
                 className="btn-primary w-full"
@@ -523,6 +568,42 @@ export function CheckoutPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="أي تفاصيل تساعد في التحقق من العملية..."
                 />
+              </div>
+
+              <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+                <label className="label" htmlFor="captcha">
+                  تحقق أمني — أجب عن السؤال
+                </label>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="shrink-0 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-4 py-2.5 text-sm font-black text-cyan-300"
+                    dir="ltr"
+                  >
+                    {captcha.q} = ؟
+                  </span>
+                  <input
+                    id="captcha"
+                    inputMode="numeric"
+                    className="input flex-1"
+                    value={captchaInput}
+                    onChange={(e) =>
+                      setCaptchaInput(e.target.value.replace(/[^0-9]/g, ''))
+                    }
+                    placeholder="الإجابة"
+                    maxLength={3}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaptcha(makeCaptcha())
+                      setCaptchaInput('')
+                    }}
+                    className="btn-ghost shrink-0"
+                    aria-label="تغيير السؤال"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {walletError && (
