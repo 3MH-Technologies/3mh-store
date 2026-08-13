@@ -4,6 +4,7 @@
 const PRODUCTS_PATH = 'data/products.json'
 const ORDERS_PATH = 'data/orders.json'
 const SETTINGS_PATH = 'data/settings.json'
+const STOCK_DIR = 'data/stock'
 const SALT_DOMAIN = '3mh-store.salt.v1'
 
 const charset = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
@@ -85,15 +86,20 @@ async function ghRequest(cfg, url, options = {}) {
 }
 
 async function readGitFile(cfg, path) {
+  const data = await readGitRaw(cfg, path)
+  const binary = atob(data.b64)
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+  const text = new TextDecoder('utf-8').decode(bytes)
+  return { sha: data.sha || '', text }
+}
+
+async function readGitRaw(cfg, path) {
   const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${path}?ref=${encodeURIComponent(cfg.githubBranch)}`)
   const data = await res.json()
   if (typeof data === 'string' || Array.isArray(data) || !data.content) {
     throw new Error('UNEXPECTED_FILE_STRUCTURE')
   }
-  const binary = atob(data.content)
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
-  const text = new TextDecoder('utf-8').decode(bytes)
-  return { sha: data.sha || '', text }
+  return { sha: data.sha || '', b64: data.content }
 }
 
 async function writeGitFile(cfg, path, text) {
@@ -142,7 +148,16 @@ async function loadCatalog(cfg, force = false) {
     // keep defaults
   }
   const products = JSON.parse(productsRes.text)
-  const data = { products, settings: settingsFile.settings }
+  const stockMap = {}
+  if (Array.isArray(products.products)) {
+    const summaries = await Promise.all(
+      products.products.map((p) => stockSummary(cfg, p.id))
+    )
+    products.products.forEach((p, i) => {
+      stockMap[p.id] = summaries[i]
+    })
+  }
+  const data = { products, settings: settingsFile.settings, stock: stockMap }
   catalogCache = { ts: Date.now(), data }
   return data
 }
@@ -248,8 +263,15 @@ function b64urlDecode(str) {
 }
 
 async function verifyToken(cfg, token) {
-  const parts = token.split('.')
+  const parts = String(token || '').split('.')
+  if (parts.length !== 2) return false
   const body = parts[0]
+  let sigBytes
+  try {
+    sigBytes = b64urlDecode(parts[1])
+  } catch {
+    return false
+  }
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(cfg.apiSecret),
@@ -260,7 +282,7 @@ async function verifyToken(cfg, token) {
   const valid = await crypto.subtle.verify(
     'HMAC',
     key,
-    b64urlDecode(parts[1]),
+    sigBytes,
     encoder.encode(body)
   )
   if (!valid) return false
@@ -309,6 +331,132 @@ function cleanText(value, max) {
   return v.trim().slice(0, max)
 }
 
+function safeRepoPath(value, allowedPrefixes) {
+  const raw = String(value ?? '').trim()
+  if (!raw || raw.length > 300) return ''
+  if (raw.includes('..') || raw.includes('\\') || raw.startsWith('/')) return ''
+  if (!allowedPrefixes.some((p) => raw.startsWith(`${p}/`))) return ''
+  return raw.replace(/[^a-zA-Z0-9._/-]/g, '').slice(0, 300)
+}
+
+// ---------- المخزون (حسابات تُسلم بعد التحقق) ----------
+
+function stockPath(productId) {
+  const id = String(productId || '')
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .slice(0, 60)
+  return `${STOCK_DIR}/${id}.json`
+}
+
+async function readStockFile(cfg, productId) {
+  const path = stockPath(productId)
+  try {
+    const { text } = await readGitFile(cfg, path)
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed.items)) return { path, items: [], exists: true }
+    return { path, items: parsed.items, exists: true }
+  } catch {
+    return { path, items: [], exists: false }
+  }
+}
+
+async function writeStockFile(cfg, path, items) {
+  const text = stampFile(
+    JSON.stringify({
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      items,
+    })
+  )
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  let sha
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      sha = (await readGitFile(cfg, path)).sha
+      break
+    } catch {
+      sha = undefined
+    }
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    }
+  }
+  const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      message: `store-db: تحديث المخزون ${path}`,
+      content: btoa(binary),
+      branch: cfg.githubBranch,
+      ...(sha ? { sha } : {}),
+    }),
+  })
+  await res.json()
+}
+
+function normalizeStockItem(raw, index, existing) {
+  const email = cleanText(raw?.email, 120)
+  const password = cleanText(raw?.password, 200)
+  const secret = cleanText(raw?.secret, 200)
+  const verifyCode = cleanText(raw?.verifyCode, 200)
+  if (!email && !password && !secret && !verifyCode) return null
+  const prev =
+    existing && existing.used && cleanText(raw?.id, 40) === existing.id
+      ? existing
+      : null
+  return {
+    id: cleanText(raw?.id, 40) || `it-${index}-${Math.random().toString(36).slice(2, 8)}`,
+    email,
+    password,
+    secret,
+    verifyCode,
+    used: prev ? true : false,
+    orderId: prev ? prev.orderId || null : null,
+    usedAt: prev ? prev.usedAt || null : null,
+  }
+}
+
+async function stockSummary(cfg, productId) {
+  const { items, exists } = await readStockFile(cfg, productId)
+  const used = items.filter((i) => i.used).length
+  return { hasStock: exists && items.length > 0, total: items.length, available: items.length - used }
+}
+
+const CONTENT_TYPES = {
+  '.txt': 'text/plain; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.zip': 'application/zip',
+  '.rar': 'application/vnd.rar',
+  '.7z': 'application/x-7z-compressed',
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.mp4': 'video/mp4',
+  '.mp3': 'audio/mpeg',
+  '.exe': 'application/octet-stream',
+  '.apk': 'application/vnd.android.package-archive',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv; charset=utf-8',
+}
+
+function contentTypeFor(fileName) {
+  const dot = String(fileName || '').lastIndexOf('.')
+  if (dot === -1) return 'application/octet-stream'
+  return CONTENT_TYPES[String(fileName).slice(dot).toLowerCase()] || 'application/octet-stream'
+}
+
+function fileNameFromPath(path) {
+  return String(path || '').split('/').pop() || 'download'
+}
+
 function headerValue(headers, name) {
   if (!headers) return ''
   const value = typeof headers.get === 'function' ? headers.get(name) : headers[name]
@@ -337,11 +485,13 @@ function ok(data, status = 200) {
   return { status, body: data }
 }
 
-export async function handleApi({ method, pathname, search, headers, body, env, ip }) {
+export async function handleApi({ method, pathname, search, headers, body, env, ip, origin }) {
   const cfg = makeEnv(env)
   if (!isConfigured(cfg)) {
     return internalError('قاعدة البيانات غير مهيأة على الخادم')
   }
+
+  const baseOrigin = String(origin || '').replace(/\/$/, '')
 
   const path = pathname.replace(/^\/api\//, '')
   const segments = path.split('/').filter(Boolean)
@@ -351,14 +501,57 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
     // GET /api/catalog
     if (method === 'GET' && base === 'catalog') {
       const data = await loadCatalog(cfg)
+      const products = Array.isArray(data.products?.products) ? data.products.products : []
+      for (const p of products) {
+        if (p.image && (p.image.startsWith('images/') || p.image.startsWith('files/'))) {
+          p.image = `${baseOrigin}/api/img?path=${encodeURIComponent(p.image)}`
+        }
+        const summary = data.stock?.[p.id]
+        if (summary?.hasStock) {
+          p.stock = { total: summary.total, available: summary.available }
+        }
+      }
       return ok(data)
     }
 
     // GET /api/orders/:id
     if (method === 'GET' && base === 'orders' && segments.length === 2) {
+      if (isRateLimited(`orders:${ip}`, 60, 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
       const orderId = cleanText(segments[1], 40)
       const file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
       const order = file.orders.find((o) => o.id === orderId) ?? null
+      if (order && Array.isArray(order.deliveries)) {
+        if (order.status === 'verified' && cfg.assetSecret) {
+          const decrypted = []
+          for (const d of order.deliveries) {
+            if (!d.payload || !d.iv) continue
+            try {
+              const plain = await decryptPayload(
+                cfg.assetSecret,
+                d.payload,
+                d.iv,
+                `${SALT_DOMAIN}${order.id}`
+              )
+              const parsed = JSON.parse(plain)
+              decrypted.push({
+                productId: d.productId || '',
+                title: d.title || '',
+                email: parsed.email || '',
+                password: parsed.password || '',
+                secret: parsed.secret || '',
+                verifyCode: parsed.verifyCode || '',
+              })
+            } catch {
+              // skip غير قابل للفك
+            }
+          }
+          order.deliveries = decrypted
+        } else {
+          order.deliveries = []
+        }
+      }
       return ok({ order })
     }
 
@@ -380,31 +573,50 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       if (honey) {
         return ok({ order: { id: safeId(), status: 'pending' } })
       }
-      const { products, settings } = await loadCatalog(cfg)
+      let catalog = await loadCatalog(cfg)
+      const itemsInRaw = Array.isArray(input.items) ? input.items.slice(0, 20) : []
+      const buildItems = (data) => {
+        const catalogs = Array.isArray(data.products?.products) ? data.products.products : []
+        const items = []
+        for (const rawItem of itemsInRaw) {
+          const productId = cleanText(rawItem?.productId, 60)
+          const qty = Number(rawItem?.qty)
+          const product = catalogs.find((p) => p.id === productId)
+          if (!product) {
+            return { error: 'أحد المنتجات لم يعد متوفراً — حدّث السلة' }
+          }
+          if (!Number.isInteger(qty) || qty < 1 || qty > 10) continue
+          const summary = data.stock?.[productId]
+          if (summary?.hasStock && summary.available < qty) {
+            return { error: `الكمية المطلوبة من «${product.name}» غير متوفرة — المتاح حالياً ${summary.available}`, outOfStock: true }
+          }
+          items.push({
+            productId,
+            title: cleanText(product.name, 60),
+            price: Math.round(Number(product.price || 0) * 100) / 100,
+            qty,
+          })
+        }
+        return { items }
+      }
+      let built = buildItems(catalog)
+      if (built.outOfStock) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        catalog = await loadCatalog(cfg, true)
+        built = buildItems(catalog)
+      }
+      if (built.error) {
+        return badRequest('VALIDATION', built.error)
+      }
+      const { products, settings } = catalog
       const catalogs = Array.isArray(products.products) ? products.products : []
       const walletMethods = Array.isArray(settings?.wallets)
         ? settings.wallets.map((w) => w.method)
         : []
-      const itemsIn = Array.isArray(input.items) ? input.items.slice(0, 20) : []
-      if (itemsIn.length < 1) {
+      if (itemsInRaw.length < 1) {
         return badRequest('VALIDATION', 'السلة فارغة — لا يمكن إرسال الطلب')
       }
-      const items = []
-      for (const rawItem of itemsIn) {
-        const productId = cleanText(rawItem?.productId, 60)
-        const qty = Number(rawItem?.qty)
-        const product = catalogs.find((p) => p.id === productId)
-        if (!product) {
-          return badRequest('VALIDATION', 'أحد المنتجات لم يعد متوفراً — حدّث السلة')
-        }
-        if (!Number.isInteger(qty) || qty < 1 || qty > 10) continue
-        items.push({
-          productId,
-          title: cleanText(product.name, 60),
-          price: Math.round(Number(product.price || 0) * 100) / 100,
-          qty,
-        })
-      }
+      const items = built.items
       if (items.length === 0) {
         return badRequest('VALIDATION', 'لا توجد منتجات صالحة في السلة')
       }
@@ -535,18 +747,78 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
           const orders = Array.isArray(file.orders) ? file.orders : []
           const index = orders.findIndex((o) => o.id === orderId)
           if (index === -1) throw new Error('ORDER_NOT_FOUND')
+
+          if (status === 'verified') {
+            if (!cfg.assetSecret) throw new Error('NO_ASSET_SECRET')
+            const needs = new Map()
+            for (const item of orders[index].items || []) {
+              needs.set(item.productId, (needs.get(item.productId) || 0) + item.qty)
+            }
+            const plans = []
+            for (const [pid, qty] of needs) {
+              const stockFile = await readStockFile(cfg, pid)
+              if (!stockFile.exists) continue
+              const stockItems = stockFile.items
+              const available = stockItems.filter((i) => !i.used)
+              if (available.length < qty) {
+                const name = (orders[index].items || []).find((i) => i.productId === pid)?.title || pid
+                throw new Error(`NO_STOCK:${name}`)
+              }
+              plans.push({ pid, qty, stockFile, stockItems })
+            }
+            const deliveries = []
+            for (const plan of plans) {
+              let assigned = 0
+              for (const it of plan.stockItems) {
+                if (it.used || assigned >= plan.qty) continue
+                it.used = true
+                it.orderId = orderId
+                it.usedAt = new Date().toISOString()
+                const encrypted = await encryptPayload(
+                  cfg.assetSecret,
+                  JSON.stringify({
+                    email: it.email || '',
+                    password: it.password || '',
+                    secret: it.secret || '',
+                    verifyCode: it.verifyCode || '',
+                  }),
+                  `${SALT_DOMAIN}${orderId}`
+                )
+                deliveries.push({
+                  productId: plan.pid,
+                  title:
+                    (orders[index].items || []).find((i) => i.productId === plan.pid)
+                      ?.title || plan.pid,
+                  payload: encrypted.payload,
+                  iv: encrypted.iv,
+                })
+                assigned += 1
+              }
+              await withWriteLock(cfg, plan.stockFile.path, () =>
+                writeStockFile(cfg, plan.stockFile.path, plan.stockItems)
+              )
+            }
+            orders[index].deliveries = deliveries
+          }
           orders[index].status = status
           if (status === 'verified') orders[index].verifiedAt = new Date().toISOString()
           if (status !== 'verified') orders[index].verifiedAt = null
           const notes = cleanText(input.notes, 300)
           if (input.notes !== undefined) orders[index].notes = notes
           await writeGitFile(cfg, ORDERS_PATH, stampFile(JSON.stringify(file)))
+          catalogCache = { ts: 0, data: null }
           return orders[index]
         }).catch((e) => {
           if (e instanceof Error && e.message.includes('ORDER_NOT_FOUND')) return null
+          if (e instanceof Error && e.message.startsWith('NO_STOCK:')) {
+            return { __noStock: e.message.slice(9) }
+          }
           throw e
         })
         if (!updated) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+        if (updated.__noStock) {
+          return badRequest('NO_STOCK', `لا يوجد مخزون متاح كافٍ لـ «${updated.__noStock}» — أضف عناصر من تبويب المنتجات`)
+        }
         return ok({ order: updated })
       }
 
@@ -619,6 +891,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
             tag: cleanText(raw?.tag, 40),
             icon: cleanText(raw?.icon, 30) || 'Bot',
             gradient: cleanText(raw?.gradient, 60) || 'from-cyan-500 to-blue-600',
+            image: cleanText(raw?.image, 300) || '',
             description: cleanText(raw?.description, 400),
             features: Array.isArray(raw?.features)
               ? raw.features.map((f) => cleanText(f, 100)).filter(Boolean).slice(0, 20)
@@ -645,6 +918,101 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         })
         catalogCache = { ts: 0, data: null }
         return ok({ ok: true })
+      }
+
+      // POST /api/admin/upload — رفع ملف منتج أو صورة إلى مستودع البيانات
+      if (segments[1] === 'upload' && segments.length === 2 && method === 'POST') {
+        let input = {}
+        try {
+          input = typeof body === 'string' ? JSON.parse(body) : body || {}
+        } catch {
+          return badRequest('BAD_JSON', 'بيانات غير صالحة')
+        }
+        const kind = input.kind === 'image' ? 'image' : input.kind === 'file' ? 'file' : ''
+        if (!kind) return badRequest('VALIDATION', 'نوع المرفق غير معروف')
+        const productId = cleanText(input.productId, 60).replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 40)
+        if (!productId) return badRequest('VALIDATION', 'معرّف المنتج مطلوب')
+        const fileName = String(input.fileName || '')
+          .split(/[\\/]/)
+          .pop()
+          .trim()
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .slice(0, 80)
+        if (!fileName) return badRequest('VALIDATION', 'اسم الملف مطلوب')
+        const b64 = typeof input.base64 === 'string' ? input.base64 : ''
+        const maxB64 = kind === 'image' ? 4 * 1024 * 1024 : 16 * 1024 * 1024
+        if (!b64 || b64.length < 16) return badRequest('VALIDATION', 'ملف فارغ أو تالف')
+        if (b64.length > maxB64) {
+          return badRequest(
+            'VALIDATION',
+            kind === 'image'
+              ? 'الصورة كبيرة جداً — الحد الأقصى 3MB'
+              : 'الملف كبير جداً — الحد الأقصى 12MB'
+          )
+        }
+        const path = `${kind === 'image' ? 'images' : 'files'}/${productId}/${fileName}`
+        let sha
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            sha = (await readGitFile(cfg, path)).sha
+            break
+          } catch {
+            sha = undefined
+          }
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 800))
+          }
+        }
+        const rawPath = `files/${productId}/${fileName}`
+        const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${rawPath}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: `store-db: رفع ${kind} ${fileName}`,
+            content: b64,
+            branch: cfg.githubBranch,
+            ...(sha ? { sha } : {}),
+          }),
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => '')
+          throw new Error(`GITHUB_${res.status}: ${text.slice(0, 160)}`)
+        }
+        return ok({ url: rawPath, path: rawPath })
+      }
+
+      // GET /api/admin/stock/:productId
+      if (segments[1] === 'stock' && segments.length === 3 && method === 'GET') {
+        const productId = cleanText(segments[2], 60)
+        const { items } = await readStockFile(cfg, productId)
+        return ok({ productId, items })
+      }
+
+      // POST /api/admin/stock/:productId — استبدال كامل لعناصر المخزون
+      if (segments[1] === 'stock' && segments.length === 3 && method === 'POST') {
+        let input = {}
+        try {
+          input = typeof body === 'string' ? JSON.parse(body) : body || {}
+        } catch {
+          return badRequest('BAD_JSON', 'بيانات غير صالحة')
+        }
+        const productId = cleanText(segments[2], 60)
+        const listIn = Array.isArray(input.items) ? input.items.slice(0, 500) : []
+        const prevItems = (await readStockFile(cfg, productId)).items
+        const items = []
+        for (let i = 0; i < listIn.length; i++) {
+          const raw = listIn[i]
+          const prev = Array.isArray(prevItems)
+            ? prevItems.find(
+                (x) => x.id && x.id === cleanText(raw?.id, 40)
+              )
+            : null
+          const normalized = normalizeStockItem(raw, i, prev)
+          if (normalized) items.push(normalized)
+        }
+        const path = stockPath(productId)
+        await withWriteLock(cfg, path, () => writeStockFile(cfg, path, items))
+        catalogCache = { ts: 0, data: null }
+        return ok({ ok: true, total: items.length })
       }
 
       // POST /api/admin/settings
@@ -784,15 +1152,76 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
           `${SALT_DOMAIN}${productId}`
         )
         const parsed = JSON.parse(plain)
+        let link = parsed.link || ''
+        if (link.startsWith('files/') || link.startsWith('images/')) {
+          link = `${baseOrigin}/api/dl?orderId=${encodeURIComponent(orderId)}&productId=${encodeURIComponent(productId)}&path=${encodeURIComponent(link)}`
+        }
         asset = {
           label: parsed.label || product.access.label || 'الملف الرقمي',
           desc: parsed.desc || '',
-          link: parsed.link || '',
+          link,
         }
       } catch {
         asset = { label: product.access.label || 'الملف الرقمي', desc: '', link: '' }
       }
       return ok({ asset })
+    }
+
+    // GET /api/dl?orderId=&productId=&path= — تحميل ملف المنتج (محمي)
+    if (method === 'GET' && base === 'dl') {
+      if (isRateLimited(`dl:${ip}`, 30, 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
+      const orderId = cleanText(search.get('orderId'), 40)
+      const productId = cleanText(search.get('productId'), 60)
+      const filePath = safeRepoPath(search.get('path'), ['files', 'images'])
+      if (!orderId || !productId || !filePath) {
+        return badRequest('VALIDATION', 'بيانات غير مكتملة')
+      }
+      let file
+      try {
+        file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+      } catch {
+        return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      }
+      const order = (file.orders || []).find((o) => o.id === orderId)
+      if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      if (order.status !== 'verified') {
+        return unauthorized('NOT_VERIFIED', 'لم يتم التحقق من الدفع بعد')
+      }
+      const hasItem = (order.items || []).some((i) => i.productId === productId)
+      if (!hasItem) return notFound('ITEM_NOT_FOUND', 'المنتج غير موجود في الطلب')
+      let raw
+      try {
+        raw = await readGitRaw(cfg, filePath)
+      } catch {
+        return notFound('FILE_NOT_FOUND', 'الملف غير موجود')
+      }
+      return {
+        status: 200,
+        binaryBase64: raw.b64,
+        contentType: contentTypeFor(fileNameFromPath(filePath)),
+        fileName: fileNameFromPath(filePath),
+      }
+    }
+
+    // GET /api/img?path= — صورة منتج عامة (مع كاش على الحافة)
+    if (method === 'GET' && base === 'img') {
+      const filePath = safeRepoPath(search.get('path'), ['images'])
+      if (!filePath) return badRequest('VALIDATION', 'بيانات غير مكتملة')
+      let raw
+      try {
+        raw = await readGitRaw(cfg, filePath)
+      } catch {
+        return notFound('FILE_NOT_FOUND', 'الصورة غير موجودة')
+      }
+      return {
+        status: 200,
+        binaryBase64: raw.b64,
+        contentType: contentTypeFor(fileNameFromPath(filePath)),
+        fileName: fileNameFromPath(filePath),
+        publicCache: true,
+      }
     }
 
     return notFound('NOT_FOUND', 'الواجهة غير موجودة')

@@ -13,6 +13,7 @@ export function ProductCard({ product, onDetails }: ProductCardProps) {
   const { addToCart } = useStore()
   const Icon = getIcon(product.icon)
   const discount = discountPercent(product.originalPrice, product.price)
+  const outOfStock = typeof product.stock?.available === 'number' && product.stock.available <= 0
 
   return (
     <article className="card group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/40 hover:shadow-glow">
@@ -23,9 +24,18 @@ export function ProductCard({ product, onDetails }: ProductCardProps) {
         aria-label={`عرض تفاصيل ${product.name}`}
       >
         <div
-          className={`flex h-40 items-center justify-center bg-gradient-to-br ${product.gradient}`}
+          className={`flex h-40 items-center justify-center overflow-hidden bg-gradient-to-br ${product.gradient}`}
         >
-          <Icon className="h-14 w-14 text-white/90 transition-transform duration-300 group-hover:scale-110" />
+          {product.image ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <Icon className="h-14 w-14 text-white/90 transition-transform duration-300 group-hover:scale-110" />
+          )}
         </div>
         <span className="absolute right-3 top-3 rounded-full bg-gradient-to-l from-rose-500 to-orange-500 px-2.5 py-1 text-xs font-black text-white shadow-lg">
           {discount > 0 ? `خصم ${discount}%` : product.tag}
@@ -33,6 +43,17 @@ export function ProductCard({ product, onDetails }: ProductCardProps) {
         {product.tag && discount > 0 && (
           <span className="absolute left-3 top-3 rounded-full border border-cyan-400/30 bg-brand-900/80 px-2.5 py-1 text-[11px] font-bold text-cyan-300 backdrop-blur">
             {product.tag}
+          </span>
+        )}
+        {product.stock && (
+          <span
+            className={`absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-[11px] font-black backdrop-blur ${
+              outOfStock
+                ? 'bg-rose-500/90 text-white'
+                : 'bg-emerald-500/90 text-white'
+            }`}
+          >
+            {outOfStock ? 'نفد المخزون' : `متوفر: ${product.stock.available}`}
           </span>
         )}
       </button>
@@ -89,9 +110,10 @@ export function ProductCard({ product, onDetails }: ProductCardProps) {
             <button
               type="button"
               onClick={() => addToCart(product)}
-              className="btn-primary px-3.5 py-2 text-xs"
+              disabled={outOfStock}
+              className="btn-primary px-3.5 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40"
             >
-              أضف للسلة
+              {outOfStock ? 'نفد المخزون' : 'أضف للسلة'}
             </button>
           </div>
         </div>

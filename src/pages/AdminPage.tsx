@@ -219,12 +219,14 @@ const setStatus = async (order: Order, status: Order['status']) => {
         status === 'verified' ? 'success' : 'info'
       )
       await load()
-    } catch (err) {
+} catch (err) {
       const msg = err instanceof Error ? err.message : ''
       if (msg.includes('UNAUTHORIZED')) {
         notify('انتهت صلاحية الجلسة، سجّل الدخول مجدداً', 'error')
       } else if (msg.includes('ORDER_NOT_FOUND')) {
         notify('الطلب غير موجود', 'error')
+      } else if (msg.includes('NO_STOCK')) {
+        notify(msg, 'error')
       } else {
         notify('تعذر تحديث حالة الطلب', 'error')
       }

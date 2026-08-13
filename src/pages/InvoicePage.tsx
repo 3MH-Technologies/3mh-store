@@ -14,6 +14,7 @@ import { api } from '../lib/api'
 import { getProductsByIds } from '../lib/products'
 import { useStore } from '../context/StoreContext'
 import type { Order } from '../types'
+import { DeliveryCards } from '../components/DeliveryCards'
 import {
   ORDER_STATUS_COLORS,
   ORDER_STATUS_LABELS,
@@ -80,14 +81,18 @@ export function InvoicePage() {
           for (const pid of productIds) {
             const product = catalog.find((p) => p.id === pid)
             if (!product) continue
-            const asset = await api.getAccess(order.id, pid)
-            if (asset?.link) {
-              results.push({
-                productId: pid,
-                label: asset.label,
-                desc: asset.desc,
-                link: asset.link,
-              })
+            try {
+              const asset = await api.getAccess(order.id, pid)
+              if (asset?.link) {
+                results.push({
+                  productId: pid,
+                  label: asset.label,
+                  desc: asset.desc,
+                  link: asset.link,
+                })
+              }
+            } catch {
+              // منتج بلا أصول — نتجاهل
             }
           }
           if (!cancelled) setAssets(results)
@@ -271,6 +276,11 @@ export function InvoicePage() {
             <p className="mt-1 text-xs text-slate-400">
               طلبك مؤكد بنجاح، إليك كل ما اشتريته.
             </p>
+            {order.deliveries && order.deliveries.length > 0 && (
+              <div className="mt-4">
+                <DeliveryCards deliveries={order.deliveries} />
+              </div>
+            )}
             {decrypting ? (
               <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
                 <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />

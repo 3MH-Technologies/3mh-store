@@ -9,6 +9,7 @@ import { HomePage } from './pages/HomePage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { TrackOrderPage } from './pages/TrackOrderPage'
 import { InvoicePage } from './pages/InvoicePage'
+import { PaymentMethodsPage } from './pages/PaymentMethodsPage'
 import { AdminPage } from './pages/AdminPage'
 
 function ScrollToTop() {
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="/track" element={<TrackOrderPage />} />
               <Route path="/track/:orderId" element={<TrackOrderPage />} />
               <Route path="/invoice/:orderId" element={<InvoicePage />} />
+              <Route path="/payment-methods" element={<PaymentMethodsPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="*" element={<HomePage />} />
             </Routes>

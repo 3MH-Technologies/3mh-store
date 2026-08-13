@@ -29,6 +29,14 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
   const categoryAr =
     settings.categories.find((c) => c.id === product.category)?.ar ??
     product.category
+  const outOfStock =
+    typeof product.stock?.available === 'number' && product.stock.available <= 0
+  const maxQty = Math.min(
+    10,
+    typeof product.stock?.available === 'number'
+      ? Math.max(1, product.stock.available)
+      : 10
+  )
 
   return (
     <Modal open={Boolean(product)} onClose={onClose} maxWidth="max-w-3xl">
@@ -36,7 +44,15 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
         <div
           className={`relative flex h-52 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${product.gradient}`}
         >
-          <Icon className="h-20 w-20 text-white/90" />
+          {product.image ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Icon className="h-20 w-20 text-white/90" />
+          )}
           <span className="absolute right-3 top-3 rounded-full bg-gradient-to-l from-rose-500 to-orange-500 px-3 py-1 text-xs font-black text-white">
             {discount > 0 ? `خصم ${discount}%` : product.tag}
           </span>
@@ -58,6 +74,17 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
             <span className="flex items-center gap-1 text-emerald-300">
               <Zap className="h-3.5 w-3.5" /> تسليم فوري بعد التحقق
             </span>
+            {product.stock && (
+              <span
+                className={`flex items-center gap-1 ${
+                  outOfStock ? 'text-rose-400' : 'text-cyan-300'
+                }`}
+              >
+                {outOfStock
+                  ? 'نفد المخزون'
+                  : `متوفر: ${product.stock.available} عنصر`}
+              </span>
+            )}
           </div>
 
           <p className="mt-4 text-sm leading-7 text-slate-300">{product.description}</p>
@@ -81,7 +108,8 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
               <button
                 type="button"
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
-                className="px-3.5 py-2.5 text-lg font-black text-slate-300 transition-colors hover:text-cyan-300"
+                disabled={outOfStock}
+                className="px-3.5 py-2.5 text-lg font-black text-slate-300 transition-colors hover:text-cyan-300 disabled:opacity-30"
                 aria-label="إنقاص الكمية"
               >
                 −
@@ -91,8 +119,9 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
               </span>
               <button
                 type="button"
-                onClick={() => setQty((q) => Math.min(10, q + 1))}
-                className="px-3.5 py-2.5 text-lg font-black text-slate-300 transition-colors hover:text-cyan-300"
+                onClick={() => setQty((q) => Math.min(maxQty, q + 1))}
+                disabled={outOfStock}
+                className="px-3.5 py-2.5 text-lg font-black text-slate-300 transition-colors hover:text-cyan-300 disabled:opacity-30"
                 aria-label="زيادة الكمية"
               >
                 +
@@ -104,9 +133,10 @@ export function ProductModal({ product, onClose }: ProductModalProps) {
                 addToCart(product, qty)
                 onClose()
               }}
-              className="btn-primary flex-1"
+              disabled={outOfStock}
+              className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              أضف إلى السلة
+              {outOfStock ? 'نفد المخزون' : 'أضف إلى السلة'}
             </button>
           </div>
         </div>

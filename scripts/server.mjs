@@ -65,7 +65,18 @@ const server = createServer(async (req, res) => {
         body,
         env: process.env,
         ip,
+        origin: url.origin,
       })
+      if (result.binaryBase64) {
+        res.writeHead(result.status, {
+          'Content-Type': result.contentType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.fileName || 'download')}"`,
+          'Cache-Control': result.publicCache ? 'public, max-age=86400' : 'no-store',
+          ...SECURITY_HEADERS,
+        })
+        res.end(Buffer.from(result.binaryBase64, 'base64'))
+        return
+      }
       res.writeHead(result.status, {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-store',

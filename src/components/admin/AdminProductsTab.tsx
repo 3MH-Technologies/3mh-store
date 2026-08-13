@@ -1,19 +1,26 @@
-﻿import { useMemo, useState } from 'react'
+﻿import { useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Check,
+  ImagePlus,
   Loader2,
   LockKeyhole,
+  Package,
+  Paperclip,
   Pencil,
   Plus,
   Trash2,
+  Upload,
+  X,
   AlertTriangle,
 } from 'lucide-react'
 import type { Product } from '../../types'
 import { ICONS } from '../../lib/icons'
 import { formatUSD } from '../../lib/format'
 import { useStore } from '../../context/StoreContext'
+import { api, getAdminToken } from '../../lib/api'
 import { Modal } from '../ui/Modal'
+import { AdminStockModal } from './AdminStockModal'
 
 const GRADIENTS = [
   'from-cyan-500 to-blue-600',
@@ -37,6 +44,7 @@ interface Draft {
   tag: string
   icon: string
   gradient: string
+  image: string
   description: string
   features: string
   sales: string
@@ -57,6 +65,7 @@ function toDraft(p: Product): Draft {
     tag: p.tag,
     icon: p.icon,
     gradient: p.gradient,
+    image: p.image ?? '',
     description: p.description,
     features: p.features.join('\n'),
     sales: String(p.sales),
@@ -76,6 +85,7 @@ function emptyDraft(): Draft {
     tag: '',
     icon: 'Bot',
     gradient: GRADIENTS[0],
+    image: '',
     description: '',
     features: '',
     sales: '0',
@@ -90,8 +100,12 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<Product | null>(null)
+  const [stockFor, setStockFor] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState('')
+  const [uploading, setUploading] = useState<'file' | 'image' | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -103,9 +117,12 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
 
   const totalPrice = products.reduce((sum, p) => sum + p.price, 0)
 
+  const makeId = () =>
+    `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+
   const openNew = () => {
     setEditingId(null)
-    setDraft(emptyDraft())
+    setDraft({ ...emptyDraft(), id: makeId() })
   }
 
   const openEdit = (p: Product) => {
@@ -113,14 +130,72 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
     setDraft(toDraft(p))
   }
 
+  const readFileBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = String(reader.result || '')
+        resolve(result.includes(',') ? result.slice(result.indexOf(',') + 1) : result)
+      }
+      reader.onerror = () => reject(new Error('تعذر قراءة الملف'))
+      reader.readAsDataURL(file)
+    })
+
+  const uploadFile = async (kind: 'file' | 'image', file: File) => {
+    if (!draft) return
+    const token = getAdminToken()
+    if (!token) {
+      notify('انتهت صلاحية الجلسة، سجّل الدخول مجدداً', 'error')
+      return
+    }
+    if (kind === 'file' && file.size > 12 * 1024 * 1024) {
+      notify('الملف كبير جداً — الحد الأقصى 12MB', 'error')
+      return
+    }
+    if (kind === 'image' && file.size > 3 * 1024 * 1024) {
+      notify('الصورة كبيرة جداً — الحد الأقصى 3MB', 'error')
+      return
+    }
+    setUploading(kind)
+    try {
+      const base64 = await readFileBase64(file)
+      const result = await api.uploadAsset(
+        token,
+        kind,
+        draft.id,
+        file.name,
+        base64
+      )
+      if (kind === 'image') {
+        set('image', result.url)
+        notify('تم رفع الصورة — احفظ المنتج لتأكيدها', 'success')
+      } else {
+        set('accessPayload', result.url)
+        notify('تم رفع الملف — الرابط التلقائي جاهز، احفظ المنتج', 'success')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      notify(
+        msg.includes('UNAUTHORIZED')
+          ? 'انتهت صلاحية الجلسة، سجّل الدخول مجدداً'
+          : msg.includes('VALIDATION')
+            ? msg.replace(/^.*?VALIDATION[^:]*:\s*/, '')
+            : 'تعذر رفع الملف، حاول مرة أخرى',
+        'error'
+      )
+    } finally {
+      setUploading(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (!draft) return
     setSaving(true)
     try {
-      const id =
-        editingId ||
-        `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+      const id = editingId || draft.id || makeId()
 
       const payload = draft.accessPayload.trim()
       const existing = editingId
@@ -148,6 +223,7 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
         tag: draft.tag.trim(),
         icon: draft.icon,
         gradient: draft.gradient,
+        image: draft.image.trim() || undefined,
         description: draft.description.trim(),
         features: draft.features
           .split('\n')
@@ -230,14 +306,15 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
           <p className="text-sm font-bold text-slate-300">لا توجد منتجات</p>
         </div>
       ) : (
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-800">
-          <table className="w-full text-xs">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+          <table className="w-full min-w-[640px] text-xs">
             <thead>
               <tr className="bg-slate-900/70 text-slate-400">
                 <th className="px-4 py-3 text-start font-bold">المنتج</th>
                 <th className="px-4 py-3 text-center font-bold">الفئة</th>
                 <th className="px-4 py-3 text-end font-bold">السعر</th>
                 <th className="px-4 py-3 text-center font-bold">المبيعات</th>
+                <th className="px-4 py-3 text-center font-bold">المخزون</th>
                 <th className="px-4 py-3 text-center font-bold">التسليم</th>
                 <th className="px-4 py-3 text-end font-bold">إجراءات</th>
               </tr>
@@ -249,11 +326,19 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
                   <tr key={p.id} className="text-slate-300">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient}`}
-                        >
-                          <Icon className="h-4 w-4 text-white" />
-                        </span>
+                        {p.image ? (
+                          <img
+                            src={p.image}
+                            alt={p.name}
+                            className="h-10 w-10 shrink-0 rounded-lg border border-slate-700 object-cover"
+                          />
+                        ) : (
+                          <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${p.gradient}`}
+                          >
+                            <Icon className="h-4 w-4 text-white" />
+                          </span>
+                        )}
                         <div className="min-w-0">
                           <p className="font-bold text-slate-200 line-clamp-1">
                             {p.name}
@@ -277,6 +362,31 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">{p.sales}</td>
+                    <td className="px-4 py-3 text-center">
+                      {p.stock ? (
+                        <button
+                          type="button"
+                          onClick={() => setStockFor(p)}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black transition ${
+                            p.stock.available > 0
+                              ? 'border-emerald-400/30 bg-emerald-400/5 text-emerald-300 hover:bg-emerald-400/10'
+                              : 'border-rose-400/30 bg-rose-400/5 text-rose-300 hover:bg-rose-400/10'
+                          }`}
+                        >
+                          <Package className="h-3 w-3" />
+                          {p.stock.available} / {p.stock.total}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setStockFor(p)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-dashed border-slate-700 px-2 py-1 text-[10px] font-bold text-slate-500 transition hover:border-cyan-400/40 hover:text-cyan-300"
+                        >
+                          <Package className="h-3 w-3" />
+                          إدارة
+                        </button>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       {p.access?.payload && p.access.iv ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400">
@@ -315,6 +425,14 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {stockFor && (
+        <AdminStockModal
+          product={stockFor}
+          onClose={() => setStockFor(null)}
+          notify={notify}
+        />
       )}
 
       {draft && (
@@ -498,6 +616,138 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
               </label>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                    <Paperclip className="h-4 w-4 text-cyan-300" />
+                    ملف المنتج (التسليم)
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-primary px-3 py-1.5 text-[11px]"
+                    disabled={uploading !== null}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading === 'file' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                    رفع ملف
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadFile('file', file)
+                    }}
+                  />
+                </div>
+                {draft.accessPayload ? (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-2.5">
+                    <span className="mt-0.5 text-emerald-400">
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-emerald-300">
+                        رابط تلقائي جاهز
+                      </p>
+                      <p
+                        dir="ltr"
+                        className="truncate text-start text-[10px] text-slate-400"
+                        title={draft.accessPayload}
+                      >
+                        {draft.accessPayload}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-slate-500 hover:text-rose-300"
+                      onClick={() => set('accessPayload', '')}
+                      aria-label="إزالة رابط الملف"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                    ارفع ملف المنتج وسيُنشأ له رابط تلقائياً (يُشفر ولا يُعرض إلا
+                    بعد التحقق من الدفع).
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                    <ImagePlus className="h-4 w-4 text-purple-300" />
+                    صورة المنتج
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-ghost px-3 py-1.5 text-[11px]"
+                    disabled={uploading !== null}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {uploading === 'image' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                    رفع صورة
+                  </button>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadFile('image', file)
+                    }}
+                  />
+                </div>
+                <div className="mt-3">
+                  {draft.image ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={draft.image}
+                        alt="معاينة"
+                        className="h-16 w-16 rounded-lg border border-slate-700 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-emerald-300">
+                          صورة مرفوعة
+                        </p>
+                        <p
+                          dir="ltr"
+                          className="truncate text-start text-[10px] text-slate-500"
+                          title={draft.image}
+                        >
+                          {draft.image}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-md p-1 text-slate-500 hover:text-rose-300"
+                        onClick={() => set('image', '')}
+                        aria-label="إزالة الصورة"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] leading-5 text-slate-500">
+                      بدون صورة — ستظهر الأيقونة والتدرج اللوني.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <label className="block">
               <span className="mb-1 block text-xs font-bold text-slate-400">
                 رابط التسليم / محتوى الأصول
@@ -510,8 +760,8 @@ export function AdminProductsTab({ className = '' }: { className?: string }) {
               />
               <span className="mt-1 block text-[10px] leading-5 text-slate-500">
                 يُشفر تلقائياً AES-GCM (بمفتاح الأصول) عند الحفظ ولا يظهر إلا
-                للعميل بعد التحقق من الدفع. اتركه فارغاً لإبقاء الرابط المشفر
-                الحالي دون تغيير.
+                للعميل بعد التحقق من الدفع. استخدم زر «رفع ملف» أعلاه لتوليد
+                الرابط تلقائياً، أو اتركه فارغاً لإبقاء الرابط الحالي دون تغيير.
               </span>
             </label>
 

@@ -1,5 +1,5 @@
 ﻿import { Link, useNavigate } from 'react-router-dom'
-import { Search, ShoppingCart } from 'lucide-react'
+import { CreditCard, Search, ShoppingCart } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import { Logo } from './ui/Logo'
 
@@ -35,6 +35,12 @@ export function Header() {
           >
             تتبع الطلب
           </Link>
+          <Link
+            to="/payment-methods"
+            className="rounded-lg px-3 py-2 text-sm font-bold text-slate-300 transition-colors hover:text-cyan-300"
+          >
+            طرق الدفع
+          </Link>
           <a
             href={settings.supportTelegramUrl}
             target="_blank"
@@ -53,6 +59,14 @@ export function Header() {
             className="rounded-xl border border-slate-700 p-2.5 text-slate-300 transition-colors hover:border-cyan-400/50 hover:text-cyan-300 md:hidden"
           >
             <Search className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/payment-methods')}
+            aria-label="طرق الدفع"
+            className="rounded-xl border border-slate-700 p-2.5 text-slate-300 transition-colors hover:border-cyan-400/50 hover:text-cyan-300 md:hidden"
+          >
+            <CreditCard className="h-4 w-4" />
           </button>
           <button
             type="button"

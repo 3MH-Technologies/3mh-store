@@ -86,12 +86,34 @@ export interface Product {
   tag: string
   icon: string
   gradient: string
+  image?: string
   description: string
   features: string[]
   specs: { label: string; value: string }[]
   sales: number
   rating: number
   access: AccessInfo
+  stock?: { total: number; available: number }
+}
+
+export interface StockItem {
+  id: string
+  email: string
+  password: string
+  secret: string
+  verifyCode: string
+  used: boolean
+  orderId: string | null
+  usedAt: string | null
+}
+
+export interface DeliveryItem {
+  productId: string
+  title: string
+  email: string
+  password: string
+  secret: string
+  verifyCode: string
 }
 
 export interface ProductsFile {
@@ -138,6 +160,7 @@ export interface Order {
   status: OrderStatus
   verifiedAt: string | null
   notes: string
+  deliveries?: DeliveryItem[]
 }
 
 export interface OrdersFile {

@@ -1,4 +1,4 @@
-import type { Order, Product, ProductsFile, SettingsFile, SiteSettings } from '../types'
+import type { Order, Product, ProductsFile, SettingsFile, SiteSettings, StockItem } from '../types'
 
 export interface Catalog {
   products: ProductsFile
@@ -160,6 +160,39 @@ export const api = {
       token,
       body: { settings },
     })
+  },
+
+  async uploadAsset(
+    token: string,
+    kind: 'file' | 'image',
+    productId: string,
+    fileName: string,
+    base64: string
+  ): Promise<{ url: string }> {
+    const data = await request<{ url: string }>('/api/admin/upload', {
+      token,
+      body: { kind, productId, fileName, base64 },
+    })
+    return data
+  },
+
+  async getStock(token: string, productId: string): Promise<StockItem[]> {
+    const data = await request<{ items: StockItem[] }>(
+      `/api/admin/stock/${encodeURIComponent(productId)}`,
+      { token }
+    )
+    return data.items ?? []
+  },
+
+  async saveStock(
+    token: string,
+    productId: string,
+    items: StockItem[]
+  ): Promise<void> {
+    await request<{ ok: boolean }>(
+      `/api/admin/stock/${encodeURIComponent(productId)}`,
+      { token, body: { items } }
+    )
   },
 
   async getAccess(

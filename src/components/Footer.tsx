@@ -44,6 +44,14 @@ export function Footer() {
                 تتبع طلبك
               </Link>
             </li>
+            <li>
+              <Link
+                to="/payment-methods"
+                className="transition-colors hover:text-cyan-300"
+              >
+                طرق الدفع
+              </Link>
+            </li>
           </ul>
         </div>
 

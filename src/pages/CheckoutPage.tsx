@@ -345,6 +345,10 @@ export function CheckoutPage() {
                   {errors.email && (
                     <p className="mt-1 text-xs text-rose-400">{errors.email}</p>
                   )}
+                  <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                    كود التحقق لحسابات المخزون يُرسل على هذا البريد من فريق
+                    الدعم بعد مراسلته.
+                  </p>
                 </div>
                 <div>
                   <label className="label" htmlFor="telegram">تيليجرام (يُفضّل)</label>
