@@ -1,0 +1,603 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-13T13:11:56.401Z",
+  "currency": "USD",
+  "products": [
+    {
+      "id": "pkg-trader-pro",
+      "name": "باكيت سكريبتات تداول العملات الرقمية",
+      "category": "scripts",
+      "price": 39,
+      "originalPrice": 129,
+      "tag": "الأكثر مبيعًا",
+      "icon": "CandlestickChart",
+      "gradient": "from-cyan-500/30 to-purple-500/30",
+      "description": "حزمة متكاملة من سكريبتات التداول الجاهزة للعملات الرقمية: بوت متابعة الأسعار، تنبيهات المؤشرات الفنية، وجدولة الصفقات على Binance و Bybit. تعمل على Node.js مع واجهة أوامر سهلة وتوثيق عربي كامل.",
+      "features": [
+        "أكثر من 30 سكريبت جاهز للتشغيل الفوري",
+        "تنبيهات كسر الأسعار وإشعارات تليجرام",
+        "أوامر تحديث المحفظة وتحليل فني تلقائي",
+        "دعم كامل لمنصات Binance و Bybit و Kucoin",
+        "توثيق بالعربية والإنجليزية خطوة بخطوة",
+        "تحديثات مجانية مدى الحياة من إصدار الشراء"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v4.2.0"
+        },
+        {
+          "label": "اللغة",
+          "value": "Node.js + Python 3.10+"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / Linux / macOS"
+        },
+        {
+          "label": "آخر تحديث",
+          "value": "يوليو 2026"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر ZIP"
+        }
+      ],
+      "sales": 214,
+      "rating": 4.9,
+      "access": {
+        "label": "حزمة السكريبتات الكاملة ZIP",
+        "payload": "4gTTZ/I38q4MvvOlLhTSAE22m6YvkqMMPZY09ke3zzRDdkgxmf/mRn+NIFBdHI2rCsTmmFpWM7BfpYunK5F4a2xTXVN2nqpchTvPT47z0jMasf/A2i4XBEbGvlIzSdSbyD89aabV07PBGZuilGh2mVnZylv8jLnEPkshAWRazUQYMkj9XbUXFqwGQ3v5NWlESAirms4TXA7lL/mJqIqI2zBT3tezf2GK4bagZwDhnnm5Ll9GIJGmBY6tZS/W7Qmhxew1ozO0CPjOyOhkdOzMGa2oVQ==",
+        "iv": "P1VkvqAGpEDhTl8f"
+      }
+    },
+    {
+      "id": "pkg-whatsapp-leads",
+      "name": "سكريبت تنظيم قوائم عملاء واتساب Lead Miner",
+      "category": "scripts",
+      "price": 24.5,
+      "originalPrice": 69,
+      "tag": "الأكثر طلبًا",
+      "icon": "MessageSquareText",
+      "gradient": "from-emerald-500/30 to-cyan-500/30",
+      "description": "أداة لفرز وتنظيم أرقام العملاء من قوائم ومجموعات مملوكة، مع فلترة ذكية حسب الدولة وفحص وجود الأرقام على واتساب، وتصدير Excel / CSV جاهز للحملات التسويقية.",
+      "features": [
+        "فحص الأرقام النشطة على واتساب تلقائيًا",
+        "فلترة حسب الدولة وحذف المكررات",
+        "دعم عدة حسابات بجلسات منفصلة",
+        "تصدير Excel و CSV و Google Sheets",
+        "تشغيل على مدار الساعة دون تدخل",
+        "حماية البيانات وعدم استخدامها خارج القائمة"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v3.1.0"
+        },
+        {
+          "label": "اللغة",
+          "value": "Python 3.10+"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / Linux"
+        },
+        {
+          "label": "التوافق",
+          "value": "WhatsApp Web / Business"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر + فيديو شرح"
+        }
+      ],
+      "sales": 168,
+      "rating": 4.8,
+      "access": {
+        "label": "السكريبت + فيديو التشغيل",
+        "payload": "esP6J9ATeNhY+u84+/h5mt/KT3gYeSU2nxWmar596Eth8VfJVVkAiiecUNgwkYxrO9quOI9xhKHUeAlflygJ3Yj3d927QAGRyfY7SC8VrVvNLkCi60B8mqaqFzlMt8Vz9hxJbC/mE0k68H1Z2bvZlJjHTqvEyoUFMdVsnTkpqjpkwa5HDYS85G2QRzr7UzHQsmBMqLsY0ypeXfWLiP1xGkY1Fda750AIuI+GpDXd5YN/08pFuqSXdnmM7Q==",
+        "iv": "GwpW4MHBzHb0wLWh"
+      }
+    },
+    {
+      "id": "tools-autopost-studio",
+      "name": "منصة إدارة المنشورات AutoPost Studio",
+      "category": "tools",
+      "price": 49,
+      "originalPrice": 149,
+      "tag": "للمسوقين",
+      "icon": "Rocket",
+      "gradient": "from-fuchsia-500/30 to-purple-500/30",
+      "description": "نظام متكامل لإدارة منشورات السوشيال ميديا مكتوب بـ React و Node.js: جدولة النشر على تويتر وإنستجرام وفيسبوك، مكتبة قوالب عربية جاهزة، تحليل أداء المنشورات، ولوحة تحكم عربية كاملة.",
+      "features": [
+        "جدولة ذكية بأوقات الذروة لكل منصة",
+        "مكتبة تضم 500+ قالب منشور عربي",
+        "محلل أداء: انطباعات وتفاعل ونمو المتابعين",
+        "تكامل API مع المنصات الثلاث الرئيسية",
+        "دعم متعدد الحسابات الصفحات",
+        "حماية الوصول بمفاتيح API منفصلة"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v2.8.0"
+        },
+        {
+          "label": "التقنية",
+          "value": "React + Node.js + PostgreSQL"
+        },
+        {
+          "label": "بيئة التشغيل",
+          "value": "VPS / Docker / cPanel"
+        },
+        {
+          "label": "المتطلبات",
+          "value": "VPS بسعة 2GB RAM"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "مستودع خاص + دليل تنصيب"
+        }
+      ],
+      "sales": 96,
+      "rating": 4.7,
+      "access": {
+        "label": "الكود المصدري الكامل + دليل النشر",
+        "payload": "DEHbH8WBNrcFzwQbNk6O2j2i4fCHCv9qVLGCgMP6IM7Y+Ql6qbKMvYOq6cVqWiQ6DW0K/1JxGeQ6EFo820fSHTdVfec4S3fCkuYojrXDUsWcyPnnhp2akpozafGEhcba05seii1Aj7fv3xP3MFHd9LEarHADTz5V9lu1JyVp4y7S1LVOMPpqqqcx/b5DI59UnABom9g2KZT0J3ZEDlGVc2/+H4WAVaTGdho/bWOZh1+0cPRmuXpTmbCsz94+pD2rMGx/mjZ1ugVGeQ==",
+        "iv": "S/Fpg4+SiuGaHI3Y"
+      }
+    },
+    {
+      "id": "tools-store-autoreply",
+      "name": "بوت الرد التلقائي للأعمال عبر واتساب",
+      "category": "tools",
+      "price": 19.9,
+      "originalPrice": 59,
+      "tag": "بداية ذكية",
+      "icon": "Bot",
+      "gradient": "from-sky-500/30 to-cyan-500/30",
+      "description": "بوت رد تلقائي لمتاجر الأعمال عبر واتساب: يجيب عن الأسئلة الشائعة، يرسل عروض الأسعار، يشارك روابط الدفع، ويحفظ سجل الطلبات في لوحة تحكم منظمة وسهلة.",
+      "features": [
+        "ردود جاهزة للأسئلة الشائعة",
+        "إرسال عروض أسعار وسريع",
+        "تصنيف العملاء: جدد / حاليين / VIP",
+        "تصدير محادثات PDF للاحتفاظ بسجل",
+        "تفعيل خلال 5 دقائق",
+        "وضع آمن بلا رسائل مزعجة"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v1.6.0"
+        },
+        {
+          "label": "اللغة",
+          "value": "Python + WebSocket"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / VPS"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر"
+        }
+      ],
+      "sales": 320,
+      "rating": 4.9,
+      "access": {
+        "label": "البوت + لوحة التحكم",
+        "payload": "cU7pFXobX5qfFqn1DICtvBOtavy5WOOHwTbyvui1b+y82qX0Tyl8IeB66Pw7wSXh+MOsOyqZKVbmb7yJAOaVjos/O2orZlkc0E2ZU3Qk081nrYvbYD6wlD02PObGaKuvh43NeaLhFNE7dw4yJ/Btl+8IE3suaAFqgHlL0JobaP18VOCZCIyNRymsk4elQ7HRNtjyPUtfWKVyEkGm2HL5ZwCipFji63xXetpq/kKO",
+        "iv": "GpMVAUEIk9DB+AfI"
+      }
+    },
+    {
+      "id": "pkg-pricebot",
+      "name": "سكريبت متابعة أسعار المنافسين PriceBot",
+      "category": "scripts",
+      "price": 34,
+      "originalPrice": 89,
+      "tag": "حصري",
+      "icon": "SearchCheck",
+      "gradient": "from-amber-500/30 to-orange-500/30",
+      "description": "بوت بيانات يتابع أسعار المنتجات في متاجر المنافسين (لاستخدامه في جمع البيانات العامة فقط): يتتبع تغييرات الأسعار والتخفيضات، ويصدر تقارير تسعير يومية جاهزة للمراجع.",
+      "features": [
+        "متابعة دورية لأسعار 1000+ منتج",
+        "فلترة حسب الأسواق العربية والخليجية",
+        "تقارير يومية PDF و Excel تلقائية",
+        "إشعارات تليجرام فورية عند تغيير السعر",
+        "دعم وكلاء بروكسي ودوران IP",
+        "قواعد أخلاقية واحترام ملفات robots.txt"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v1.9.2"
+        },
+        {
+          "label": "اللغة",
+          "value": "Python + Scrapy"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / Linux"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر"
+        }
+      ],
+      "sales": 87,
+      "rating": 4.6,
+      "access": {
+        "label": "السكريبت + قواعد البيانات التجريبية",
+        "payload": "p8zpJaB7yAZSS94Y692M7hwqmr1YCEfnaNMU6fMfYo/z7JvgQ+JBvU1MTCe1jYrZvJBic36DKeENCs2H6JHxL6JUkNc3iXnEct2eMyFYinFQj3lZeGYSYxMjVGLU9WlR9tCwNmi7xX5nzdgd7+r4TfspxhSIisgOTjrXA7KbPPNmqByMKxP7dloJfo4RkakKLIiqiIpKEMDLYvvyjvUjsvya3jOTJ5jyu30d1ii7iF+7q14=",
+        "iv": "1VZwCFsxbNcFVTOv"
+      }
+    },
+    {
+      "id": "tools-dl-manager",
+      "name": "أداة تنظيم مكتبة المحتوى الرقمي DownloadHub",
+      "category": "tools",
+      "price": 29,
+      "originalPrice": 79,
+      "tag": "بلا وسيط",
+      "icon": "DownloadCloud",
+      "gradient": "from-rose-500/30 to-red-500/30",
+      "description": "أداة سطر أوامر لإدارة وتنظيم ملفات المحتوى الرقمي: تصنيف تلقائي للمجلدات، استخراج الصوتيات، تشفير النسخ الاحتياطية، ومزامنة مكتباتك بين الأجهزة بنقرة واحدة.",
+      "features": [
+        "تصنيف تلقائي للملفات بالذكاء الاصطناعي",
+        "استخراج الصوت بجودة عالية",
+        "تشغيل مهام جدولة يومية",
+        "مزامنة آمنة بين الأجهزة",
+        "تقارير حجم المكتبات وتنظيف المكرر",
+        "واجهة عربية بسيطة"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v2.3.0"
+        },
+        {
+          "label": "اللغة",
+          "value": "Python 3.11"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / macOS / Linux"
+        },
+        {
+          "label": "الاستخدام",
+          "value": "للمحتوى المملوك شخصيًا"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر"
+        }
+      ],
+      "sales": 201,
+      "rating": 4.8,
+      "access": {
+        "label": "الأداة + دليل الإعداد السريع",
+        "payload": "DFVyNhWsqHITqaYDixImJgArLGJ+IdV+Czxa9DfgHuvo/BnK/rG/vTv4CmENKBtXnkiLHV6k5wbPIf5jlvZZ8urV5oF5c9lHgnhglqryCySx7QykJ0arKBpaFoaiwHLxoxV+bqTSX2KDnLtW1j7uIUgJ+v7LBAm/KMtwtc4XJdTu9P9gR09LSr7PlXJA3WO4DaZmk9Eu3RrXqHA0L9CnLJGJ1aNoAw==",
+        "iv": "12ylpawggP+D+PiM"
+      }
+    },
+    {
+      "id": "crs-cyber-basics",
+      "name": "كورس أساسيات الأمن السيبراني — عربي",
+      "category": "courses",
+      "price": 59,
+      "originalPrice": 199,
+      "tag": "طلياني",
+      "icon": "ShieldCheck",
+      "gradient": "from-violet-500/30 to-indigo-500/30",
+      "description": "كورس عربي شامل من الصفر: مفاهيم التشفير، اختبار الاختراق الأخلاقي، أمن الشبكات، والحماية من التصيد. يضم أكثر من 40 ساعة فيديو وتمارين معملية عملي واختبارًا نهائيًا مع شهادة إتمام موثقة.",
+      "features": [
+        "40 ساعة فيديو بجودة 1080p بالعربية",
+        "مختبر عملي لتجربة كل أداة",
+        "ملفات العرض قابلة للتحميل",
+        "شهادة إتمام احترافية باسمك",
+        "اختبارات تفاعلية بعد كل وحدة",
+        "تحديثات المحتوى مدى الحياة"
+      ],
+      "specs": [
+        {
+          "label": "المدة",
+          "value": "40 ساعة / 12 أسبوعًا"
+        },
+        {
+          "label": "المستوى",
+          "value": "مبتدئ إلى متوسط"
+        },
+        {
+          "label": "اللغة",
+          "value": "بالعربية الفصحى"
+        },
+        {
+          "label": "الشهادة",
+          "value": "نعم — معرف تحقق فريد"
+        },
+        {
+          "label": "التسليم",
+          "value": "بيانات دخول على منصة خاصة"
+        }
+      ],
+      "sales": 142,
+      "rating": 4.9,
+      "access": {
+        "label": "بيانات دخول المنصة + تفعيل الشهادة",
+        "payload": "F+DVtIR1tIUyhokGC7etmUacDRqzaoK30/okLMxlHDPETQBrrIBACcRYy53VO4vSfPd4Ee2chk5fsSnq+qzpAOM2NUU3w6i2QP/YqCEq8CEPDce7zkqYE4Rmx/g4FEk2v+5ImIYi1RlsWPt8RdIM8Tj9NzonfWRkHPyFFmwQiIKFpnjlS9yp0loXgPERiFGn/mUerjXfWeKlQHd5cP9veHA9Cg34DZmjlGwvP6J2rMKJIuxn390ElA9tnWlILYzfb86VFQBlKJWu4a82tL6FD3YT23ipKfcwQvOWedUpUYQlxMo=",
+        "iv": "wQG/xUiRg/pttcug"
+      }
+    },
+    {
+      "id": "crs-webdev-master",
+      "name": "مسار مطور الويب الكامل Next.js + React — عربي",
+      "category": "courses",
+      "price": 79,
+      "originalPrice": 249,
+      "tag": "بزنس",
+      "icon": "Code2",
+      "gradient": "from-sky-500/30 to-cyan-500/30",
+      "description": "مسار احترافي من الصفر إلى بناء المتاجر والمواقع الكاملة: TypeScript، Tailwind، Next.js، قواعد البيانات، وإطلاق المشاريع على الاستضافة — مع 6 مشاريع عملية تصلح لسيرة ذاتية مميزة.",
+      "features": [
+        "70 ساعة فيديو عربية مع الشفرة على الشاشة",
+        "6 مشاريع عملية كاملة قابلة للنشر",
+        "قسم كامل لقواعد البيانات والأمان",
+        "دعم مباشر عبر مجتمع الدورة 6 أشهر",
+        "ملخصات وملفات عمل قابلة للتنزيل",
+        "شهادة إتمام تسلسلية"
+      ],
+      "specs": [
+        {
+          "label": "المدة",
+          "value": "70 ساعة / 16 أسبوعًا"
+        },
+        {
+          "label": "المستوى",
+          "value": "مبتدئ تمامًا"
+        },
+        {
+          "label": "اللغة",
+          "value": "عربي + كود بالإنجليزية"
+        },
+        {
+          "label": "المتطلب",
+          "value": "جهاز حاسوب فقط"
+        },
+        {
+          "label": "التسليم",
+          "value": "رابط دخول دائم"
+        }
+      ],
+      "sales": 233,
+      "rating": 5,
+      "access": {
+        "label": "رابط تسجيل الطالب + ملفات المشاريع",
+        "payload": "o5l9lF4bkZkt5qy2yZxkvmhnkuSB70w9icOrCvRSgzq5IwJmuM0Vw7FpVp7XIGMtUiXLHPN9Kr4xSv+Dv1Q+GhwRbAIqV9UxOBhvfUSzN7aejt389+IDEFOcr4Z5gcZoJ0aFTLkCctQXpvR1c+ccbpyaJaypYGU8pnHzIwwrULqYyN20cWJqrZpvdKy4LmvW1GLndghdHIb0eIQ1XZHtZP26pS4nSj6JDlCFKCTlByJ8QqXufuoU8viwlNhX3yep5Ho3fXmUnE41SGMjCyKe2g8FXS0pH52qb6Ja",
+        "iv": "i8eB5lqLiTJXuXP2"
+      }
+    },
+    {
+      "id": "crs-ai-automation",
+      "name": "الذكاء الاصطناعي التطبيقي: 40+ أداة عملية — عربي",
+      "category": "courses",
+      "price": 45,
+      "originalPrice": 139,
+      "tag": "الأسرع نموًا",
+      "icon": "Sparkles",
+      "gradient": "from-cyan-500/30 to-fuchsia-500/30",
+      "description": "دورة عملية تشرح توظيف الذكاء الاصطناعي في الكتابة الإبداعية، والمحتوى التسويقي، والتقارير الدورية، وأتمتة المهام اليومية — مع تجربة مباشرة لكل أداة واستراتيجيات إنتاج محتوى فعالة.",
+      "features": [
+        "27 ساعة تدريب عملي على أدوات AI",
+        "أطر عمل وأوراق غش لكل حالة استخدام",
+        "بناء مساعدين ذكيين لعملك",
+        "استراتيجيات إنشاء محتوى طويل",
+        "حزمة برومبتات جاهزة للاستعمال",
+        "مجتمع متدربين خاص ووصول حصري"
+      ],
+      "specs": [
+        {
+          "label": "المدة",
+          "value": "27 ساعة / 6 أسابيع"
+        },
+        {
+          "label": "المستوى",
+          "value": "مبتدئ"
+        },
+        {
+          "label": "اللغة",
+          "value": "بالعربية"
+        },
+        {
+          "label": "التسليم",
+          "value": "رابط دخول دائم"
+        }
+      ],
+      "sales": 511,
+      "rating": 4.8,
+      "access": {
+        "label": "منصة الدورة + حزمة البرومبتات",
+        "payload": "4nzLMiaCQJjjrMcN89x+CW18HLhHQrpmzfXg7vuHlgBzalTmx1NPV4YHYw5GodG1CdWx9fDtYQugusHaQlxutBv0Nbz/9AYjUQ/jS5J1n8imKgS8hG7sgd+QAgcNGhwhhku6y5I03qRDL0mPQK0WtHuo1LuMuBvxRnZTbCo83BabTmy7Ez7MlnL18ZKo4psL3vrzQBVkpkLy2c0HnnJ9RFX87v0C/l7b2N8b77EZ666NZb9InTc+iwAGDpxpBfswbfRXW+K90NkTsQ==",
+        "iv": "yNodRpo72LOrnqfA"
+      }
+    },
+    {
+      "id": "lic-chatgpt-plus",
+      "name": "اشتراك ChatGPT Plus — 12 شهرًا",
+      "category": "licenses",
+      "price": 89,
+      "originalPrice": 179,
+      "tag": "عرض محدود",
+      "icon": "MessageSquare",
+      "gradient": "from-emerald-500/30 to-teal-500/30",
+      "description": "اشتراك سنوي كامل في ChatGPT Plus: وصول إلى أحدث النماذج، تحليل الملفات المرفقة، توليد الصور، وأولوية في السرعة والأداء. يتم تسليم بيانات الدخول خلال ساعات من تأكيد العملية.",
+      "features": [
+        "اشتراك كامل لمدة 12 شهرًا",
+        "أحدث النماذج وبدون حدود تشغيل للشركات",
+        "تحليل مستندات وملفات",
+        "توليد صور متقدمة",
+        "دعم فني عربي سريع",
+        "ضمان استرداد إن لم يفعّل خلال 48 ساعة"
+      ],
+      "specs": [
+        {
+          "label": "المدة",
+          "value": "12 شهرًا"
+        },
+        {
+          "label": "طريقة التسليم",
+          "value": "بيانات حساب على بريدك"
+        },
+        {
+          "label": "الأجهزة",
+          "value": "ويب + موبايل + ديسكتوب"
+        },
+        {
+          "label": "الضمان",
+          "value": "استبدال مجاني خلال يومين"
+        }
+      ],
+      "sales": 74,
+      "rating": 4.7,
+      "access": {
+        "label": "بيانات الدخول + مستند الضمان",
+        "payload": "bQ2e3qjJ2QJARbY8hzF3g6xQI46c2/bCVgpxJI2yGGV2m6p5mDE8+XvV0KYNMjobsYtVCyNwrERAP2Rg1rPmr8Vqxkt0CadDqm90JxjaY3VhDSymokEkxIJTXpxPBW7gxTxMj0gp5Qc+VEC8WczlNlHTi/ItPbelx7oxHKV8HQKz/xZ/yWFnQBOmk+CnyUiLKMoNv/q8HUgAIVlZhv0iXgVzG8Il38qnjBIyWn6VI21qej0+Bqjopv4TJKoWZjrOmFFsKGxKAZ91ol9g9wH2QWeYG0Tc/NAMaW03JUlz+Vysed8UfZ0Vy78=",
+        "iv": "oWhQGdB0wPnQXdeF"
+      }
+    },
+    {
+      "id": "lic-windows11-pro",
+      "name": "رخصة ويندوز 11 برو أصلية",
+      "category": "licenses",
+      "price": 34,
+      "originalPrice": 119,
+      "tag": "ضمان مدى الحياة",
+      "icon": "Monitor",
+      "gradient": "from-blue-500/30 to-indigo-500/30",
+      "description": "مفتاح ترخيص أصلي لنظام ويندوز 11 برو مع تحديثات مدى الحياة، يُفعّل خلال دقيقة، ودعم فني توصيل في حالة المساعدة — شهادة أصالة الترخيص مرفقة داخل الفاتورة الإلكترونية.",
+      "features": [
+        "تفعيل رقمي فوري ودائم",
+        "تحديثات ويندوز الكاملة المضمونة",
+        "يغطي جميع إصدارات 11 الدالة",
+        "دعم BitLocker و Remote Desktop و Hyper-V",
+        "مساندة تركيب عن بعد مجانية",
+        "أكثر من 20 ألف عملية ناجحة"
+      ],
+      "specs": [
+        {
+          "label": "النوع",
+          "value": "Windows 11 Pro OEM"
+        },
+        {
+          "label": "المعمارية",
+          "value": "64-bit"
+        },
+        {
+          "label": "طريقة التفعيل",
+          "value": "رقمي عبر الإنترنت"
+        },
+        {
+          "label": "الضمان",
+          "value": "مدى حياة الجهاز"
+        }
+      ],
+      "sales": 189,
+      "rating": 4.9,
+      "access": {
+        "label": "مفتاح الرخص + تعليمات التفعيل",
+        "payload": "+r5h2nAZreZKZO2ZsxC/9F22D0JnyR5ayv8d7mNO2d0UIqDG/92/oE9PQdTdL5BE6ZUDkLL9ubWovka6bIpk/ez8rAcO7H43Qgdo5rCSG+eNeouN8BDyLSZh+mZg0Gkzq9mONZQKTWl2kbCObIhgWplk5xAOscMlBn9PbI7g2Yu4aNJXw/kjxMgzr6fcB5MUvDEoB/XpBXgDkMWKU/Hqily8xXaVidnHt/Rn07BRZNZC5vB/3yPJsgfyzdhzdHa+7z9r",
+        "iv": "iYl/mWYYk/+liwz5"
+      }
+    },
+    {
+      "id": "lic-business-saas",
+      "name": "اشتراك منصة إدارة الفرق الذكية — فريق كامل",
+      "category": "licenses",
+      "price": 119,
+      "originalPrice": 259,
+      "tag": "للمؤسسات",
+      "icon": "Building2",
+      "gradient": "from-purple-500/30 to-violet-500/30",
+      "description": "اشتراك منصة متكاملة لإدارة الفرق لعام كامل: مساحات عمل لـ5 مستخدمين، أتمتة المهام بالذكاء الاصطناعي، تقارير أداء متقدمة، وتكامل مع الأدوات الخارجية — مثالية للفرق الناشئة والشركات الصغيرة.",
+      "features": [
+        "5 مقاعد للمستخدمين مع صلاحيات مرنة",
+        "أتمتة المهام والتقارير بالذكاء الاصطناعي",
+        "تكامل مع Slack و Notion و Google Workspace",
+        "لوحة تحكم عربية بالكامل",
+        "بدء الاستخدام خلال ساعتين",
+        "تحديثات وترقيات مجانية"
+      ],
+      "specs": [
+        {
+          "label": "المدة",
+          "value": "12 شهرًا / تجديد اختياري"
+        },
+        {
+          "label": "المستخدمون",
+          "value": "5 مستخدمين"
+        },
+        {
+          "label": "المنصات",
+          "value": "Web / Mobile / API"
+        },
+        {
+          "label": "التجربة",
+          "value": "ضمان 14 يومًا"
+        }
+      ],
+      "sales": 58,
+      "rating": 4.8,
+      "access": {
+        "label": "دعوة لوحة الفريق + دليل البداية",
+        "payload": "Pl7BV9+LB/aEa6J9KYbvXi0hKrHfdVnMVJqft87pxLbXGkshTTKx1mh11u1KC9B3N5/TY5RiXuKeUuLUU7TgoCrKz61eCncMrUFUui/y+QOpv2rL656AmAA/1EeSW8cw6yX5uQ+K/nR0t8t6ba2aTIRAPNsrXKVW+zBkO76Yw0do5une5HjXiMhaoNihZ61WkYccso0oer/iAxhI1VRJxMR5XZ3h5YCDWG53Estmq71wMwvQUdeVCOFKGeZN7Dq3IzkLDo0cB6T6SH/4BuhbHw==",
+        "iv": "2HkftpeUATi5rRs0"
+      }
+    },
+    {
+      "id": "pkg-telegram-bot",
+      "name": "بوت تيليجرام متعدد الاستخدامات TelegramHub",
+      "category": "scripts",
+      "price": 27,
+      "originalPrice": 69,
+      "tag": "قيمة أكبر",
+      "icon": "Send",
+      "gradient": "from-lime-500/30 to-emerald-500/30",
+      "description": "سكربت بوت تيليجرام جاهز لمتعدد الاستخدامات: قنوات بث العروض، نظام تذاكر الدعم، ربط الدفع الإلكتروني، وإرسال تقارير يومية لمؤشرات متجرك — مع لوحة تحكم ويب بسيطة.",
+      "features": [
+        "قنوات عروض مع ضبط الصلاحيات",
+        "نظام دعم وقفع التذاكر",
+        "ربط بوابات الدفع وأتمتة الردود",
+        "تقارير يومية لمؤشرات الأداء",
+        "لوحة تحكم عبر الويب",
+        "توثيق عربي كامل"
+      ],
+      "specs": [
+        {
+          "label": "الإصدار",
+          "value": "v2.1.0"
+        },
+        {
+          "label": "اللغة",
+          "value": "Python + python-telegram-bot"
+        },
+        {
+          "label": "أنظمة التشغيل",
+          "value": "Windows / Linux"
+        },
+        {
+          "label": "نوع التسليم",
+          "value": "تحميل مباشر"
+        }
+      ],
+      "sales": 267,
+      "rating": 4.8,
+      "access": {
+        "label": "السكريبت + وثيقة الإعداد",
+        "payload": "5lUFLgNYbeUVI9xCsCQdptcCfgvmPPSKeDIYERr0oQndtc3AKNcI+Ez4moVmmY9YWQniFgNjDQ8MiEPLGtndwk5ge8ZWDFH9aQ2UOgbfXEV7GsZepo3fL0XVY01L6Tzc1KkP/HlPWkiX9P9vqMLuzbqcqoc6wq7zeOClSqpUHFstwy5XwBMAlRdXzyqy0cKdaXIB0ncSGcnFgeI1lJ2M6o650zYmnnUrSyPgN352RSan+D5MQLKMqxHaIim5Y7L4LoBVhroYx9dF6bepB0lfwjliNA==",
+        "iv": "KgGpYgqUw6CSgTpZ"
+      }
+    }
+  ]
+}

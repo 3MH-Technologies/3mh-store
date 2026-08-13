@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-13T13:11:23.427Z",
+  "settings": {
+    "appName": "3MH STORE",
+    "appNameAr": "متجر 3MH التقني",
+    "companyName": "3MH TECHNOLOGIES",
+    "companyTagline": "حلول تقنية رقمية بأعلى جودة — سكربتات، أدوات، كورسات وتراخيص",
+    "brandUrl": "https://3mh.pages.dev/ar/",
+    "supportEmail": "support@3mh.pages.dev",
+    "supportTelegramUsername": "j49_c",
+    "supportTelegramUrl": "https://t.me/j49_c",
+    "usdToSar": 3.75,
+    "categories": [
+      {
+        "id": "tools",
+        "ar": "أدوات برمجية",
+        "en": "Developer Tools"
+      },
+      {
+        "id": "scripts",
+        "ar": "سكربتات وأكواد",
+        "en": "Scripts & Source Code"
+      },
+      {
+        "id": "courses",
+        "ar": "كورسات تقنية",
+        "en": "Tech Courses"
+      },
+      {
+        "id": "licenses",
+        "ar": "اشتراكات وتراخيص",
+        "en": "Licenses & Subscriptions"
+      }
+    ],
+    "hero": {
+      "badge": "سوق رقمي للمنتجات التقنية — دفع مشفّر وتسليم آلي",
+      "titleHighlight": "بسعر يبدأ من الخصم",
+      "subtitle": "سكربتات جاهزة، أدوات أتمتة، كورسات تقنية حديثة واشتراكات وتراخيص — كل ما يحتاجه المطور وصاحب العمل في مكان واحد، مع توصيل رقمي فوري بعد تأكيد العملية.",
+      "stats": [
+        {
+          "label": "منتج رقمي",
+          "value": "13",
+          "suffix": "+",
+          "animate": true
+        },
+        {
+          "label": "معدل الرضا",
+          "value": "4.9",
+          "suffix": "/5",
+          "decimals": 1,
+          "animate": true
+        },
+        {
+          "label": "شبكات دفع",
+          "value": "5",
+          "suffix": "+",
+          "animate": true
+        },
+        {
+          "label": "وقت التسليم",
+          "value": "فوري",
+          "animate": false
+        }
+      ],
+      "trustBadges": [
+        "دفع مشفّر بالعملات الرقمية",
+        "حماية الأصول AES-GCM",
+        "مراجعة يدوية لكل طلب"
+      ]
+    },
+    "trust": [
+      {
+        "icon": "Zap",
+        "title": "تسليم فوري",
+        "desc": "تُفتح روابط الأصول تلقائياً بعد التحقق من العملية مباشرة."
+      },
+      {
+        "icon": "ShieldCheck",
+        "title": "ضمان موثق",
+        "desc": "كل منتج يُفحص ويُختبر، مع تحديثات مجانية عند توفرها."
+      },
+      {
+        "icon": "Wallet",
+        "title": "دفع بالعملات الرقمية",
+        "desc": "USDT على شبكات TRC20 / BEP20 / ERC20 مع BTC وETH — أيّها أسهل لك."
+      },
+      {
+        "icon": "Headset",
+        "title": "دعم تيليجرام",
+        "desc": "فريق الدعم متاح عبر @j49_c طوال أيام الأسبوع."
+      }
+    ],
+    "wallets": [
+      {
+        "method": "usdt-trc20",
+        "name": "USDT (شبكة TRC20)",
+        "short": "USDT",
+        "address": "TT3wAiWTaQKuao3uKhTWfq8MT3s2vtLbkR",
+        "kind": "address",
+        "instruction": "افتح محفظتك (Binance / Trust Wallet / OKX) واختر تحويل USDT على شبكة TRC20، ثم ألصق العنوان أعلاه وأرسل المبلغ المطلوب.",
+        "note": "أرسل المبلغ بالدولار (USDT) على شبكة TRC20 حصراً، أي شبكة أخرى قد تسبب فقدان المبلغ."
+      },
+      {
+        "method": "usdt-bep20",
+        "name": "USDT (شبكة BEP20)",
+        "short": "USDT",
+        "address": "0xc86a56781c77e167a325cf63ea2a41fe58189418",
+        "kind": "address",
+        "instruction": "افتح محفظتك واختر تحويل USDT على شبكة BEP20 (Binance Smart Chain)، ثم ألصق العنوان أعلاه وأرسل المبلغ المطلوب.",
+        "note": "يرجى التأكد من اختيار شبكة BEP20 عند التحويل — التحويل على شبكة أخرى قد يفقد المبلغ."
+      },
+      {
+        "method": "usdt-erc20",
+        "name": "USDT (شبكة ERC20)",
+        "short": "USDT",
+        "address": "0xcbcce2cd8790aa6c293c9d51a5b8049f0bfb717e",
+        "kind": "address",
+        "instruction": "افتح محفظتك واختر تحويل USDT على شبكة ERC20 (إيثريوم)، ثم ألصق العنوان أعلاه وأرسل المبلغ المطلوب.",
+        "note": "عمولات شبكة إيثريوم أعلى نسبياً — يُفضَّل TRC20 أو BEP20 للطلبات الصغيرة."
+      },
+      {
+        "method": "btc",
+        "name": "Bitcoin (BTC)",
+        "short": "BTC",
+        "address": "bc1qqnvwwfdak9mlud03cgvxht3epx0ks7hc7ashx9",
+        "kind": "address",
+        "instruction": "افتح محفظتك وأرسل المبلغ المطلوب بالبتكوين إلى العنوان أعلاه. يمكنك إضافة رقم الطلب في الملاحظات.",
+        "note": "يُعتمد السعر لحظة وصول الشبكة للمعاملة. أي مبلغ أقل أو أكثر يُسوّى تلقائياً معك."
+      },
+      {
+        "method": "eth",
+        "name": "Ethereum (ETH)",
+        "short": "ETH",
+        "address": "0xcd6013fdfd5b03b1de50a57d9d4dacccf75dd985",
+        "kind": "address",
+        "instruction": "افتح محفظتك وأرسل المبلغ المطلوب بالإيثريوم إلى العنوان أعلاه على شبكة ERC20.",
+        "note": "يرجى التحقق من شبكة ERC20 قبل الإرسال لتجنب فقدان الأموال."
+      }
+    ],
+    "paymentMethodLabels": {
+      "usdt-trc20": "USDT (TRC20)",
+      "usdt-bep20": "USDT (BEP20)",
+      "usdt-erc20": "USDT (ERC20)",
+      "btc": "Bitcoin (BTC)",
+      "eth": "Ethereum (ETH)",
+      "trx": "TRON (TRX)",
+      "ltc": "Litecoin (LTC)",
+      "ton": "TON"
+    },
+    "deliveryNote": "تسليم فوري رقمي بعد التحقق"
+  }
+}
