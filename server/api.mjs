@@ -103,20 +103,31 @@ async function readGitRaw(cfg, path) {
 }
 
 async function writeGitFile(cfg, path, text) {
-  const { sha } = await readGitFile(cfg, path)
-  const bytes = new TextEncoder().encode(text)
-  let binary = ''
-  for (const b of bytes) binary += String.fromCharCode(b)
-  const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${path}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      message: `store-db: تحديث ${path}`,
-      content: btoa(binary),
-      sha,
-      branch: cfg.githubBranch,
-    }),
-  })
-  await res.json()
+  let attempt = 0
+  for (;;) {
+    attempt += 1
+    const { sha } = await readGitFile(cfg, path)
+    const bytes = new TextEncoder().encode(text)
+    let binary = ''
+    for (const b of bytes) binary += String.fromCharCode(b)
+    try {
+      const res = await ghRequest(cfg, `/repos/${cfg.githubOwner}/${cfg.githubRepo}/contents/${path}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `store-db: تحديث ${path}`,
+          content: btoa(binary),
+          sha,
+          branch: cfg.githubBranch,
+        }),
+      })
+      await res.json()
+      return
+    } catch (e) {
+      const retriable = e instanceof Error && /GITHUB_(409|403|429|5\d\d)/.test(e.message)
+      if (!retriable || attempt >= 3) throw e
+      await new Promise((r) => setTimeout(r, 700 * attempt))
+    }
+  }
 }
 
 let writeChains = {}
@@ -743,9 +754,15 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         }
         const orderId = cleanText(segments[2], 40)
         const updated = await withWriteLock(cfg, ORDERS_PATH, async () => {
-          const file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
-          const orders = Array.isArray(file.orders) ? file.orders : []
-          const index = orders.findIndex((o) => o.id === orderId)
+          let file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+          let orders = Array.isArray(file.orders) ? file.orders : []
+          let index = orders.findIndex((o) => o.id === orderId)
+          for (let i = 0; i < 3 && index === -1; i++) {
+            await new Promise((r) => setTimeout(r, 900))
+            file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+            orders = Array.isArray(file.orders) ? file.orders : []
+            index = orders.findIndex((o) => o.id === orderId)
+          }
           if (index === -1) throw new Error('ORDER_NOT_FOUND')
 
           if (status === 'verified') {
@@ -1130,7 +1147,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       } catch {
         return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
       }
-      const order = (file.orders || []).find((o) => o.id === orderId)
+      let order = (file.orders || []).find((o) => o.id === orderId)
+      for (let i = 0; i < 3 && !order; i++) {
+        await new Promise((r) => setTimeout(r, 900))
+        file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+        order = (file.orders || []).find((o) => o.id === orderId)
+      }
       if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
       if (order.status !== 'verified') {
         return unauthorized('NOT_VERIFIED', 'لم يتم التحقق من الدفع بعد')
@@ -1184,7 +1206,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       } catch {
         return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
       }
-      const order = (file.orders || []).find((o) => o.id === orderId)
+      let order = (file.orders || []).find((o) => o.id === orderId)
+      for (let i = 0; i < 3 && !order; i++) {
+        await new Promise((r) => setTimeout(r, 900))
+        file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
+        order = (file.orders || []).find((o) => o.id === orderId)
+      }
       if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
       if (order.status !== 'verified') {
         return unauthorized('NOT_VERIFIED', 'لم يتم التحقق من الدفع بعد')

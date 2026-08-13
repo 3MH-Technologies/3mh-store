@@ -228,7 +228,10 @@ const setStatus = async (order: Order, status: Order['status']) => {
       } else if (msg.includes('NO_STOCK')) {
         notify(msg, 'error')
       } else {
-        notify('تعذر تحديث حالة الطلب', 'error')
+        notify(
+          msg.startsWith('GITHUB_') ? `تعذر تحديث حالة الطلب — ${msg.slice(0, 36)}` : 'تعذر تحديث حالة الطلب',
+          'error'
+        )
       }
     } finally {
       setBusyId(null)
