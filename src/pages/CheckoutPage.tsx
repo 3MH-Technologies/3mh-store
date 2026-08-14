@@ -55,7 +55,7 @@ function makeCaptcha(): Captcha {
 }
 
 export function CheckoutPage() {
-  const { cart, clearCart } = useStore()
+  const { cart, clearCart, authUser, authReady } = useStore()
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>('info')
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -131,6 +131,43 @@ export function CheckoutPage() {
       }
       setSubmitting(false)
     }
+  }
+
+  if (!authReady) {
+    return (
+      <div className="container-app flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      </div>
+    )
+  }
+
+  if (!authUser) {
+    return (
+      <div className="container-app max-w-md py-20 text-center">
+        <div className="card p-8">
+          <LockKeyhole className="mx-auto h-14 w-14 text-cyan-400" />
+          <h1 className="mt-4 text-xl font-black text-white">سجّل الدخول أولاً</h1>
+          <p className="mt-2 text-sm leading-7 text-slate-400">
+            يجب أن يكون لديك حساب لإتمام عملية الشراء ومتابعة أصولك بأمان.
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-6 w-full"
+            onClick={() => {
+              sessionStorage.setItem('3mh-auth-redirect', '/checkout')
+              navigate('/auth')
+            }}
+          >
+            تسجيل الدخول أو إنشاء حساب
+          </button>
+          {cart.length > 0 && (
+            <p className="mt-3 text-[11px] text-slate-500">
+              سلتك محفوظة — ستعود إليها بعد الدخول.
+            </p>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (cart.length === 0 && step !== 'done') {

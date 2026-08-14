@@ -17,7 +17,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { api, getAdminToken, setAdminToken } from '../lib/api'
+import { api, getAdminToken, setAdminToken, ApiError } from '../lib/api'
 import type { Order, SiteSettings } from '../types'
 import {
   ORDER_STATUS_COLORS,
@@ -220,18 +220,22 @@ const setStatus = async (order: Order, status: Order['status']) => {
       )
       await load()
 } catch (err) {
+      const code = err instanceof ApiError ? err.code : ''
       const msg = err instanceof Error ? err.message : ''
-      if (msg.includes('UNAUTHORIZED')) {
+      if (code === 'UNAUTHORIZED') {
         notify('انتهت صلاحية الجلسة، سجّل الدخول مجدداً', 'error')
-      } else if (msg.includes('ORDER_NOT_FOUND')) {
+      } else if (code === 'ORDER_NOT_FOUND') {
         notify('الطلب غير موجود', 'error')
-      } else if (msg.includes('NO_STOCK')) {
+      } else if (code === 'NO_STOCK') {
+        notify(msg, 'error')
+      } else if (code.startsWith('GITHUB_')) {
+        notify(`تعذر تحديث حالة الطلب — ${code.slice(0, 36)}`, 'error')
+      } else if (code === 'NETWORK') {
+        notify(msg, 'error')
+      } else if (msg) {
         notify(msg, 'error')
       } else {
-        notify(
-          msg.startsWith('GITHUB_') ? `تعذر تحديث حالة الطلب — ${msg.slice(0, 36)}` : 'تعذر تحديث حالة الطلب',
-          'error'
-        )
+        notify('تعذر تحديث حالة الطلب', 'error')
       }
     } finally {
       setBusyId(null)

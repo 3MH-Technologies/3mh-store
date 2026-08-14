@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { getProductsByIds } from '../lib/products'
 import { useStore } from '../context/StoreContext'
 import type { Order } from '../types'
@@ -36,7 +36,7 @@ export function TrackOrderPage() {
   const { products, settings } = useStore()
   const [input, setInput] = useState('')
   const [order, setOrder] = useState<Order | null>(null)
-  const [status, setStatus] = useState<'idle' | 'loading' | 'found' | 'missing' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'found' | 'missing' | 'error' | 'auth'>('idle')
   const [assets, setAssets] = useState<AssetLink[]>([])
   const [decrypting, setDecrypting] = useState(false)
 
@@ -61,6 +61,11 @@ export function TrackOrderPage() {
         setStatus('missing')
       }
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHORIZED') {
+        setOrder(null)
+        setStatus('auth')
+        return
+      }
       const msg = err instanceof Error ? err.message : ''
       if (msg.includes('NO_GITHUB_CONFIG')) {
         setStatus('error')
@@ -176,6 +181,28 @@ export function TrackOrderPage() {
             قم بربط متغيرات GITHUB_OWNER و GITHUB_REPO و GITHUB_TOKEN لتفعيل
             التتبع، أو تواصل مع الدعم عبر تيليجرام.
           </p>
+        </div>
+      )}
+
+      {status === 'auth' && (
+        <div className="card mx-auto mt-10 max-w-md p-8 text-center">
+          <LockKeyhole className="mx-auto h-10 w-10 text-cyan-400" />
+          <p className="mt-4 text-sm font-bold text-slate-300">
+            هذا الطلب مرتبط بحساب — سجّل الدخول لعرضه
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            استخدم البريد الإلكتروني المسجل به الطلب للمتابعة.
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-5"
+            onClick={() => {
+              sessionStorage.setItem('3mh-auth-redirect', `/track/${orderId || ''}`)
+              window.location.hash = '#/auth'
+            }}
+          >
+            تسجيل الدخول
+          </button>
         </div>
       )}
 

@@ -8,9 +8,9 @@ import {
   useState,
 } from 'react'
 import type { ReactNode } from 'react'
-import type { CartItem, Product, SiteSettings } from '../types'
+import type { CartItem, Product, SiteSettings, AuthUser } from '../types'
 import { CONFIG } from '../config'
-import { api, getAdminToken } from '../lib/api'
+import { api, getAdminToken, getAuthToken, setAuthToken } from '../lib/api'
 import { normalizeProductsFile } from '../lib/products'
 import { clampQty } from '../lib/format'
 import staticProductsData from '../../data/products.json'
@@ -42,6 +42,18 @@ interface StoreContextValue {
   clearCart: () => void
   toasts: Toast[]
   notify: (message: string, type?: Toast['type']) => void
+  authUser: AuthUser | null
+  authReady: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (input: {
+    name: string
+    email: string
+    password: string
+    telegram: string
+    honeypot?: string
+  }) => Promise<void>
+  logout: () => void
+  refreshMe: () => Promise<void>
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -225,6 +237,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setCart([]), [])
 
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [authReady, setAuthReady] = useState(false)
+
+  const refreshMe = useCallback(async () => {
+    if (!getAuthToken()) {
+      setAuthUser(null)
+      setAuthReady(true)
+      return
+    }
+    try {
+      const { user } = await api.me()
+      setAuthUser(user)
+    } catch {
+      setAuthUser(null)
+    }
+    setAuthReady(true)
+  }, [])
+
+  useEffect(() => {
+    void refreshMe()
+  }, [refreshMe])
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const { token, user } = await api.login(email, password)
+      setAuthToken(token)
+      setAuthUser(user)
+      notify(`مرحباً بك، ${user.name}`, 'success')
+    },
+    [notify]
+  )
+
+  const register = useCallback(
+    async (input: {
+      name: string
+      email: string
+      password: string
+      telegram: string
+      honeypot?: string
+    }) => {
+      const { token, user } = await api.register(input)
+      setAuthToken(token)
+      setAuthUser(user)
+      notify(`تم إنشاء حسابك، أهلاً ${user.name}`, 'success')
+    },
+    [notify]
+  )
+
+  const logout = useCallback(() => {
+    setAuthToken(null)
+    setAuthUser(null)
+    notify('تم تسجيل الخروج', 'info')
+  }, [notify])
+
   const cartCount = useMemo(
     () => cart.reduce((sum, item) => sum + item.qty, 0),
     [cart]
@@ -250,6 +316,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearCart,
       toasts,
       notify,
+      authUser,
+      authReady,
+      login,
+      register,
+      logout,
+      refreshMe,
     }),
     [
       products,
@@ -269,6 +341,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearCart,
       toasts,
       notify,
+      authUser,
+      authReady,
+      login,
+      register,
+      logout,
+      refreshMe,
     ]
   )
 

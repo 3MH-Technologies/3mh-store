@@ -1,4 +1,4 @@
-import type { Order, Product, ProductsFile, SettingsFile, SiteSettings, StockItem } from '../types'
+import type { Order, Product, ProductsFile, SettingsFile, SiteSettings, StockItem, AuthUser } from '../types'
 
 export interface Catalog {
   products: ProductsFile
@@ -12,6 +12,7 @@ export interface AssetResult {
 }
 
 export const ADMIN_TOKEN_KEY = '3mh-admin-token'
+export const AUTH_TOKEN_KEY = '3mh-auth-token'
 
 const API_BASE =
   typeof location !== 'undefined' && location.hostname.endsWith('.hf.space')
@@ -35,6 +36,23 @@ export function setAdminToken(token: string | null): void {
   }
 }
 
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token)
+    else localStorage.removeItem(AUTH_TOKEN_KEY)
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export class ApiError extends Error {
   code: string
   status: number
@@ -48,7 +66,7 @@ export class ApiError extends Error {
 
 async function request<T>(
   path: string,
-  init?: { method?: string; body?: unknown; token?: string | null }
+  init?: { method?: string; body?: unknown; token?: string | null; noAuth?: boolean }
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -60,7 +78,9 @@ async function request<T>(
     body = JSON.stringify(init.body)
     headers['Content-Type'] = 'application/json'
   }
+  const authToken = init?.token !== undefined ? init.token : init?.noAuth ? null : getAuthToken()
   if (init?.token) headers.Authorization = `Bearer ${init.token}`
+  else if (authToken && !init?.noAuth) headers.Authorization = `Bearer ${authToken}`
 
   let res: Response
   try {
@@ -106,6 +126,30 @@ export const api = {
       `/api/orders/${encodeURIComponent(orderId)}`
     )
     return data.order
+  },
+
+  async register(input: {
+    name: string
+    email: string
+    password: string
+    telegram: string
+    honeypot?: string
+  }): Promise<{ token: string; user: AuthUser }> {
+    return request<{ token: string; user: AuthUser }>('/api/auth/register', {
+      body: input,
+      noAuth: true,
+    })
+  },
+
+  async login(email: string, password: string): Promise<{ token: string; user: AuthUser }> {
+    return request<{ token: string; user: AuthUser }>('/api/auth/login', {
+      body: { email, password },
+      noAuth: true,
+    })
+  },
+
+  async me(): Promise<{ user: AuthUser }> {
+    return request<{ user: AuthUser }>('/api/auth/me')
   },
 
   async createOrder(input: {

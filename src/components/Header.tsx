@@ -1,10 +1,10 @@
 ﻿import { Link, useNavigate } from 'react-router-dom'
-import { CreditCard, Search, ShoppingCart } from 'lucide-react'
+import { CreditCard, LogIn, LogOut, Search, ShoppingCart, UserRound } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import { Logo } from './ui/Logo'
 
 export function Header() {
-  const { cartCount, setCartOpen, settings } = useStore()
+  const { cartCount, setCartOpen, settings, authUser, logout } = useStore()
   const navigate = useNavigate()
 
   return (
@@ -52,6 +52,42 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {authUser ? (
+            <div className="group relative">
+              <button
+                type="button"
+                aria-label="حسابي"
+                className="flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-3 py-2 text-slate-200 transition-colors hover:border-cyan-400/60"
+              >
+                <UserRound className="h-4 w-4 text-cyan-300" />
+                <span className="hidden max-w-28 truncate text-xs font-black sm:block">
+                  {authUser.name}
+                </span>
+              </button>
+              <div className="invisible absolute left-0 top-full z-30 mt-2 w-44 rounded-xl border border-slate-700 bg-slate-900/95 p-2 opacity-0 shadow-xl backdrop-blur transition-all group-hover:visible group-hover:opacity-100">
+                <p className="truncate px-2 py-1.5 text-xs font-bold text-slate-300" dir="ltr">
+                  {authUser.email}
+                </p>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-xs font-black text-rose-300 transition-colors hover:bg-rose-500/10"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  تسجيل الخروج
+                </button>
+              </div>
+            </div>
+          ) : (
+            <Link
+              to="/auth"
+              aria-label="تسجيل الدخول"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-700 px-3 py-2 text-xs font-black text-slate-200 transition-colors hover:border-cyan-400/50 hover:text-cyan-300"
+            >
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:block">دخول</span>
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => navigate('/track')}

@@ -1,5 +1,12 @@
 export type OrderStatus = 'pending' | 'verified' | 'rejected'
 
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  telegram?: string
+}
+
 export type PaymentMethod =
   | 'plisio'
   | 'usdt-trc20'
@@ -145,6 +152,7 @@ export interface Customer {
 
 export interface Order {
   id: string
+  userId?: string
   createdAt: string
   customer: Customer
   items: OrderItem[]

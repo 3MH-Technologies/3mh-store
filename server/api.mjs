@@ -4,6 +4,7 @@
 const PRODUCTS_PATH = 'data/products.json'
 const ORDERS_PATH = 'data/orders.json'
 const SETTINGS_PATH = 'data/settings.json'
+const USERS_PATH = 'data/users.json'
 const STOCK_DIR = 'data/stock'
 const SALT_DOMAIN = '3mh-store.salt.v1'
 
@@ -108,7 +109,13 @@ async function writeGitFile(cfg, path, text) {
   let attempt = 0
   for (;;) {
     attempt += 1
-    const { sha } = await readGitFile(cfg, path)
+    let sha = ''
+    try {
+      const existing = await readGitFile(cfg, path)
+      sha = existing.sha
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes('GITHUB_404'))) throw e
+    }
     const bytes = new TextEncoder().encode(text)
     let binary = ''
     for (const b of bytes) binary += String.fromCharCode(b)
@@ -276,6 +283,10 @@ function b64urlDecode(str) {
 }
 
 async function verifyToken(cfg, token) {
+  return Boolean(await verifyTokenPayload(cfg, token))
+}
+
+async function verifyTokenPayload(cfg, token) {
   const parts = String(token || '').split('.')
   if (parts.length !== 2) return false
   const body = parts[0]
@@ -306,7 +317,56 @@ async function verifyToken(cfg, token) {
     return false
   }
   if (!payload.exp || payload.exp < Date.now()) return false
-  return true
+  return payload
+}
+
+function bearerToken(headers) {
+  const auth = headerValue(headers, 'authorization')
+  return auth && auth.startsWith('Bearer ') ? auth.slice(7).trim() : ''
+}
+
+function randomHex(bytes) {
+  const arr = new Uint8Array(bytes)
+  crypto.getRandomValues(arr)
+  let hex = ''
+  for (const b of arr) hex += b.toString(16).padStart(2, '0')
+  return hex
+}
+
+async function pbkdf2Hex(password, saltHex, iterations = 100000) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  )
+  const salt = new Uint8Array(saltHex.match(/[0-9a-f]{2}/gi).map((h) => parseInt(h, 16)))
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    key,
+    256
+  )
+  const bytes = new Uint8Array(bits)
+  let hex = ''
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0')
+  return hex
+}
+
+async function readUsersFile(cfg) {
+  try {
+    const { text } = await readGitFile(cfg, USERS_PATH)
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed.users)) return { users: [], exists: true }
+    return { users: parsed.users, exists: true }
+  } catch {
+    return { users: [], exists: false }
+  }
+}
+
+async function findUserByEmail(cfg, email) {
+  const { users } = await readUsersFile(cfg)
+  return users.find((u) => u.email === email) || null
 }
 
 function timingSafeEqual(a, b) {
@@ -630,6 +690,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       const orderId = cleanText(segments[1], 40)
       const file = JSON.parse((await readGitFile(cfg, ORDERS_PATH)).text)
       const order = file.orders.find((o) => o.id === orderId) ?? null
+      if (order?.userId) {
+        const authPayload = await verifyTokenPayload(cfg, bearerToken(headers))
+        if (!authPayload || authPayload.sub !== order.userId) {
+          return unauthorized('AUTH_REQUIRED', 'سجّل الدخول لعرض هذا الطلب')
+        }
+      }
       if (order && Array.isArray(order.deliveries)) {
         if (order.status === 'verified' && cfg.assetSecret) {
           const decrypted = []
@@ -741,8 +807,15 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       discount = Math.round(discount * 100) / 100
       const total = subtotal
 
+      const authPayload = await verifyTokenPayload(cfg, bearerToken(headers))
+      const userId = authPayload && String(authPayload.sub).startsWith('u-') ? authPayload.sub : ''
+      if (!userId) {
+        return unauthorized('AUTH_REQUIRED', 'يجب تسجيل الدخول قبل إتمام الطلب')
+      }
+      const account = (await readUsersFile(cfg)).users.find((u) => u.id === userId)
+
       const name = cleanText(input.customer?.name, 60)
-      const email = cleanText(input.customer?.email, 100).toLowerCase()
+      const email = cleanText(account?.email || input.customer?.email, 100).toLowerCase()
       const telegram = cleanText(input.customer?.telegram, 100)
       const phone = cleanText(input.customer?.phone, 100)
       if (name.length < 3) return badRequest('VALIDATION', 'أدخل الاسم الكامل')
@@ -781,6 +854,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
       const order = {
         id: safeId(),
         createdAt: new Date().toISOString(),
+        userId,
         customer: { name, email, telegram, phone },
         items,
         subtotal,
@@ -808,6 +882,122 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         return order
       })
       return ok({ order: saved }, 201)
+    }
+
+    // POST /api/auth/register — إنشاء حساب عميل
+    if (method === 'POST' && base === 'auth' && segments[1] === 'register') {
+      if (isRateLimited(`authreg:${ip}`, 5, 15 * 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
+      let input = {}
+      try {
+        input = typeof body === 'string' ? JSON.parse(body) : body || {}
+      } catch {
+        return badRequest('BAD_JSON', 'بيانات غير صالحة')
+      }
+      if (cleanText(input.honeypot, 40)) {
+        return ok({ ok: true })
+      }
+      const name = cleanText(input.name, 60)
+      const email = cleanText(input.email, 120).toLowerCase()
+      const password = String(input.password || '')
+      const telegram = cleanText(input.telegram, 60)
+      if (name.length < 3) return badRequest('VALIDATION', 'أدخل اسمك الكامل (3 أحرف على الأقل)')
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        return badRequest('VALIDATION', 'أدخل بريداً إلكترونياً صحيحاً')
+      }
+      if (password.length < 8 || password.length > 72) {
+        return badRequest('VALIDATION', 'كلمة المرور يجب أن تكون بين 8 و72 حرفاً')
+      }
+      const existing = await findUserByEmail(cfg, email)
+      if (existing) {
+        return badRequest('EMAIL_TAKEN', 'هذا البريد مسجل بالفعل — سجّل الدخول')
+      }
+      const salt = randomHex(16)
+      const hash = await pbkdf2Hex(password, salt)
+      const user = {
+        id: `u-${randomHex(12)}`,
+        email,
+        name,
+        salt,
+        hash,
+        telegram,
+        createdAt: new Date().toISOString(),
+      }
+      const saved = await withWriteLock(cfg, USERS_PATH, async () => {
+        const { users } = await readUsersFile(cfg)
+        if (users.some((u) => u.email === email)) return false
+        users.push(user)
+        await writeGitFile(
+          cfg,
+          USERS_PATH,
+          stampFile(
+            JSON.stringify({ version: 1, updatedAt: new Date().toISOString(), users })
+          )
+        )
+        return true
+      })
+      if (!saved) {
+        return badRequest('EMAIL_TAKEN', 'هذا البريد مسجل بالفعل — سجّل الدخول')
+      }
+      const token = await signToken(cfg, {
+        sub: user.id,
+        iat: Date.now(),
+        exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      })
+      return ok({
+        token,
+        user: { id: user.id, email: user.email, name: user.name, telegram: user.telegram },
+      }, 201)
+    }
+
+    // POST /api/auth/login
+    if (method === 'POST' && base === 'auth' && segments[1] === 'login') {
+      if (isRateLimited(`authlog:${ip}`, 10, 15 * 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
+      let input = {}
+      try {
+        input = typeof body === 'string' ? JSON.parse(body) : body || {}
+      } catch {
+        return badRequest('BAD_JSON', 'بيانات غير صالحة')
+      }
+      const email = cleanText(input.email, 120).toLowerCase()
+      const password = String(input.password || '')
+      if (!email || !password) {
+        return badRequest('VALIDATION', 'أدخل البريد وكلمة المرور')
+      }
+      const user = await findUserByEmail(cfg, email)
+      if (!user || !user.salt || !user.hash) {
+        return unauthorized('BAD_CREDENTIALS', 'البريد أو كلمة المرور غير صحيحة')
+      }
+      const hash = await pbkdf2Hex(password, user.salt)
+      if (hash !== user.hash) {
+        return unauthorized('BAD_CREDENTIALS', 'البريد أو كلمة المرور غير صحيحة')
+      }
+      const token = await signToken(cfg, {
+        sub: user.id,
+        iat: Date.now(),
+        exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+      })
+      return ok({
+        token,
+        user: { id: user.id, email: user.email, name: user.name, telegram: user.telegram },
+      })
+    }
+
+    // GET /api/auth/me
+    if (method === 'GET' && base === 'auth' && segments[1] === 'me') {
+      const payload = await verifyTokenPayload(cfg, bearerToken(headers))
+      if (!payload || !String(payload.sub).startsWith('u-')) {
+        return unauthorized('AUTH_REQUIRED', 'يجب تسجيل الدخول')
+      }
+      const { users } = await readUsersFile(cfg)
+      const user = users.find((u) => u.id === payload.sub)
+      if (!user) return unauthorized('AUTH_REQUIRED', 'الحساب غير موجود')
+      return ok({
+        user: { id: user.id, email: user.email, name: user.name, telegram: user.telegram },
+      })
     }
 
     // POST /api/admin/login
@@ -1189,6 +1379,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         order = (file.orders || []).find((o) => o.id === orderId)
       }
       if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      if (order.userId) {
+        const authPayload = await verifyTokenPayload(cfg, bearerToken(headers))
+        if (!authPayload || authPayload.sub !== order.userId) {
+          return unauthorized('AUTH_REQUIRED', 'سجّل الدخول لعرض الأصول')
+        }
+      }
       if (order.status !== 'verified') {
         return unauthorized('NOT_VERIFIED', 'لم يتم التحقق من الدفع بعد')
       }
@@ -1248,6 +1444,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         order = (file.orders || []).find((o) => o.id === orderId)
       }
       if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      if (order.userId) {
+        const authPayload = await verifyTokenPayload(cfg, bearerToken(headers))
+        if (!authPayload || authPayload.sub !== order.userId) {
+          return unauthorized('AUTH_REQUIRED', 'سجّل الدخول لتحميل الملفات')
+        }
+      }
       if (order.status !== 'verified') {
         return unauthorized('NOT_VERIFIED', 'لم يتم التحقق من الدفع بعد')
       }
@@ -1309,6 +1511,12 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         order = (file.orders || []).find((o) => o.id === orderId)
       }
       if (!order) return notFound('ORDER_NOT_FOUND', 'الطلب غير موجود')
+      if (order.userId) {
+        const authPayload = await verifyTokenPayload(cfg, bearerToken(headers))
+        if (!authPayload || authPayload.sub !== order.userId) {
+          return unauthorized('AUTH_REQUIRED', 'سجّل الدخول للدفع')
+        }
+      }
       if (order.status !== 'pending') {
         return badRequest('ORDER_NOT_PENDING', 'الطلب لم يعد قيد الدفع')
       }
@@ -1416,6 +1624,7 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
 
     return notFound('NOT_FOUND', 'الواجهة غير موجودة')
   } catch (err) {
+    console.error('[api error]', err)
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('UNEXPECTED_FILE_STRUCTURE')) {
       return internalError('بنية البيانات غير متوقعة')

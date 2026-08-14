@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowRight,
@@ -7,19 +7,22 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  LockKeyhole,
   RefreshCw,
   Wallet,
 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { formatSAR, formatUSD } from '../lib/format'
 import type { Order } from '../types'
 
 export function PaymentPage() {
   const { orderId = '' } = useParams()
+  const navigate = useNavigate()
   const { products, settings } = useStore()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
+  const [needAuth, setNeedAuth] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [opening, setOpening] = useState(false)
   const [payError, setPayError] = useState('')
@@ -39,7 +42,16 @@ export function PaymentPage() {
         window.clearInterval(pollRef.current)
         pollRef.current = null
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHORIZED') {
+        setNeedAuth(true)
+        setLoading(false)
+        if (pollRef.current) {
+          window.clearInterval(pollRef.current)
+          pollRef.current = null
+        }
+        return
+      }
       setNotFound(true)
       setLoading(false)
     }
@@ -65,6 +77,11 @@ export function PaymentPage() {
       const invoice = await api.createPlisioInvoice(orderId, force)
       window.location.assign(invoice.invoiceUrl)
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHORIZED') {
+        setNeedAuth(true)
+        setOpening(false)
+        return
+      }
       const msg = err instanceof Error ? err.message : ''
       if (msg.includes('ORDER_NOT_PENDING')) {
         setPayError('تمت معالجة هذا الطلب بالفعل')
@@ -80,6 +97,30 @@ export function PaymentPage() {
     return (
       <div className="container-app flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
+      </div>
+    )
+  }
+
+  if (needAuth) {
+    return (
+      <div className="container-app max-w-md py-20 text-center">
+        <div className="card p-8">
+          <LockKeyhole className="mx-auto h-14 w-14 text-cyan-400" />
+          <h1 className="mt-4 text-xl font-black text-white">سجّل الدخول أولاً</h1>
+          <p className="mt-2 text-sm leading-7 text-slate-400">
+            هذا الطلب مرتبط بحساب — سجّل الدخول لمتابعة الدفع والأصول.
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-6 w-full"
+            onClick={() => {
+              sessionStorage.setItem('3mh-auth-redirect', `/pay/${orderId}`)
+              navigate('/auth')
+            }}
+          >
+            تسجيل الدخول
+          </button>
+        </div>
       </div>
     )
   }
