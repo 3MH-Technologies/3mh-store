@@ -127,7 +127,7 @@ export function CheckoutPage() {
       } else if (msg.includes('PLISIO')) {
         setWalletError('بوابة الدفع غير متاحة حالياً — حاول لاحقاً')
       } else {
-        setWalletError(`حدث خطأ أثناء إرسال الطلب: ${msg} ؟ يرجى المحاولة مرة أخرى`)
+        setWalletError(`حدث خطأ أثناء إرسال الطلب: ${msg} — يرجى المحاولة مرة أخرى`)
       }
       setSubmitting(false)
     }
