@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-14T09:30:39.747Z",
+  "users": [
+    {
+      "id": "u-ef90b026182e675dee6dc01b",
+      "email": "authtest1786699838289@test.local",
+      "name": "Auth Test",
+      "salt": "5668a622a37c7c38c75a5ce357d60c9d",
+      "hash": "d15e6007f8716a333e9004480a3941d8d2aba575dd08a79b61f8d634e800f923",
+      "telegram": "@at",
+      "createdAt": "2026-08-14T09:30:39.350Z"
+    }
+  ]
+}
