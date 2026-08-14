@@ -34,12 +34,10 @@ export function PaymentPage() {
         return
       }
       setOrder(o)
-      if (o.status !== 'pending') {
-        setLoading(false)
-        if (pollRef.current) {
-          window.clearInterval(pollRef.current)
-          pollRef.current = null
-        }
+      setLoading(false)
+      if (o.status !== 'pending' && pollRef.current) {
+        window.clearInterval(pollRef.current)
+        pollRef.current = null
       }
     } catch {
       setNotFound(true)
