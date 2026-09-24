@@ -1,10 +1,15 @@
 import { createServer } from 'node:http'
 import { readFileSync, existsSync, statSync } from 'node:fs'
-import { join, extname, resolve, sep } from 'node:path'
+import { join, extname, dirname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handleApi } from '../server/api.mjs'
 
-const DIST = resolve(fileURLToPath(new URL('../dist/', import.meta.url)))
+// Resolve dist/ relative to this file (works both from scripts/ in the repo
+// and from the Docker image layout) instead of a brittle relative string.
+const HERE = dirname(fileURLToPath(import.meta.url))
+const DIST = [resolve(HERE, '..', 'dist'), resolve(HERE, 'dist')].find((dir) =>
+  existsSync(dir)
+) ?? resolve(HERE, '..', 'dist')
 const PORT = Number(process.env.PORT || 7860)
 
 const MIME = {

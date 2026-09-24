@@ -12,8 +12,7 @@
     "server": "node --env-file=.env scripts/server.mjs",
     "seed:assets": "node --env-file=.env scripts/seed-assets.mjs",
     "db:init": "node --env-file=.env scripts/db-init.mjs",
-    "verify:assets": "node --env-file=.env scripts/verify-assets.mjs",
-    "write:config": "node --env-file=.env scripts/write-config.cjs"
+    "verify:assets": "node --env-file=.env scripts/verify-assets.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",
