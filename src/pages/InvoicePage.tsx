@@ -112,7 +112,6 @@ export function InvoicePage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.id, order?.status, products])
 
   const copyLink = async (link: string) => {

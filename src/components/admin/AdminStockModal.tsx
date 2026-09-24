@@ -54,7 +54,6 @@ export function AdminStockModal({ product, onClose, notify }: Props) {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id])
 
   const counts = useMemo(() => {

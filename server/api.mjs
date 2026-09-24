@@ -19,7 +19,28 @@ function pick(env, names) {
   return undefined
 }
 
+// Secret used to sign admin/customer session tokens. NEVER fall back to a
+// publicly-known constant (this repo is public) — when API_SECRET is unset we
+// generate a random per-process secret and warn loudly that sessions will not
+// survive a restart.
+const GENERATED_API_SECRET = (() => {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+})()
+
+let warnedMissingApiSecret = false
+
 function makeEnv(env) {
+  const apiSecret = pick(env, ['API_SECRET', 'VITE_API_SECRET'])
+  if (!apiSecret && !warnedMissingApiSecret) {
+    warnedMissingApiSecret = true
+    console.warn(
+      '⚠️⚠️⚠️ API_SECRET غير مضبوط — يتم استخدام سر عشوائي لكل عملية تشغيل. ' +
+        'لن تبقى جلسات المشرف والعملاء بعد إعادة التشغيل. ' +
+        '(API_SECRET is not set — using a random per-process secret; admin/customer sessions will NOT survive a server restart.)'
+    )
+  }
   return {
     githubOwner: pick(env, ['GITHUB_OWNER', 'VITE_GITHUB_OWNER']) || '',
     githubRepo: pick(env, ['GITHUB_REPO', 'VITE_GITHUB_REPO']) || '',
@@ -28,8 +49,7 @@ function makeEnv(env) {
     adminPin: pick(env, ['ADMIN_PIN', 'VITE_ADMIN_PIN']) || '',
     assetSecret:
       pick(env, ['ASSET_SECRET', 'VITE_ASSET_SECRET']) || '',
-    apiSecret:
-      pick(env, ['API_SECRET', 'VITE_API_SECRET']) || '3mh-store-api-change-me',
+    apiSecret: apiSecret || GENERATED_API_SECRET,
     plisioKey: pick(env, ['PLISIO_KEY', 'PLISIO_API_KEY', 'VITE_PLISIO_KEY']) || '',
     siteUrl: pick(env, ['SITE_URL', 'VITE_SITE_URL']) || '',
   }
@@ -1002,6 +1022,9 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
 
     // POST /api/admin/login
     if (method === 'POST' && base === 'admin' && segments[1] === 'login') {
+      if (isRateLimited(`adminlog:${ip}`, 5, 15 * 60 * 1000)) {
+        return { status: 429, body: { error: { code: 'RATE_LIMIT', message: 'محاولات كثيرة — حاول لاحقاً' } } }
+      }
       let input = {}
       try {
         input = typeof body === 'string' ? JSON.parse(body) : body || {}
@@ -1544,8 +1567,9 @@ export async function handleApi({ method, pathname, search, headers, body, env, 
         callback_url: `${siteBase}/api/plisio/webhook?json=true`,
         success_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
         fail_callback_url: `${siteBase}/api/plisio/webhook?json=true`,
-        success_invoice_url: `${siteBase}/pay/${orderId}`,
-        fail_invoice_url: `${siteBase}/pay/${orderId}`,
+        // The SPA uses HashRouter, so the fragment must be part of the URL.
+        success_invoice_url: `${siteBase}/#/pay/${orderId}`,
+        fail_invoice_url: `${siteBase}/#/pay/${orderId}`,
         expire_min: '30',
         language: 'en_US',
         plugin: '3mh-store',

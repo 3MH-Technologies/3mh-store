@@ -14,10 +14,13 @@ export interface AssetResult {
 export const ADMIN_TOKEN_KEY = '3mh-admin-token'
 export const AUTH_TOKEN_KEY = '3mh-auth-token'
 
+const envApiBase = import.meta.env.VITE_API_BASE
 const API_BASE =
-  typeof location !== 'undefined' && location.hostname.endsWith('.hf.space')
-    ? 'https://3mh-store.pages.dev'
-    : ''
+  envApiBase !== undefined && envApiBase !== ''
+    ? envApiBase.replace(/\/+$/, '')
+    : typeof location !== 'undefined' && location.hostname.endsWith('.hf.space')
+      ? 'https://3mh-store.pages.dev'
+      : ''
 
 export function getAdminToken(): string | null {
   try {

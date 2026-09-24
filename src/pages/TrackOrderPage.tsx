@@ -82,7 +82,6 @@ export function TrackOrderPage() {
       setInput(orderId)
       void fetchOrder(orderId)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId])
 
   const productIds = useMemo(
@@ -124,7 +123,6 @@ export function TrackOrderPage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.status, order?.id, productIds.join('|'), products])
 
   return (

@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_GITHUB_TOKEN?: string
   readonly VITE_ADMIN_PIN?: string
   readonly VITE_ASSET_SECRET?: string
+  readonly VITE_API_BASE?: string
 }
 
 interface ImportMeta {

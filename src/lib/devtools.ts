@@ -35,19 +35,9 @@ function watchDevtools() {
     const height = window.outerHeight - window.innerHeight
     if (width > threshold || height > threshold) {
       showBlocked()
-    } else {
-      const element = new Image()
-      Object.defineProperty(element, 'id', {
-        get() {
-          showBlocked()
-          return ''
-        },
-      })
-      console.log('%c', element)
     }
     if (lastTime && t - lastTime > 5000) showBlocked()
     lastTime = t
-    debugger
   }, 1000)
   void interval
 }
